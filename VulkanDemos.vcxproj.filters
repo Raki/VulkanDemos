@@ -7,15 +7,15 @@
     <Filter Include="utils">
       <UniqueIdentifier>{1f3c7d9e-8699-4254-afce-cc8a165faba0}</UniqueIdentifier>
     </Filter>
+    <Filter Include="shaders">
+      <UniqueIdentifier>{940e2ac2-69f0-47be-9cb4-75e770597855}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Example0.cpp">
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="utils\Utility.cpp">
-      <Filter>utils</Filter>
-    </ClCompile>
-    <ClCompile Include="utils\VkGLProgram.cpp">
       <Filter>utils</Filter>
     </ClCompile>
   </ItemGroup>
@@ -26,8 +26,13 @@
     <ClInclude Include="utils\Utility.h">
       <Filter>utils</Filter>
     </ClInclude>
-    <ClInclude Include="utils\VkGLProgram.h">
-      <Filter>utils</Filter>
-    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="shaders\triangle.frag.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\triangle-mvp.vert.glsl">
+      <Filter>shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

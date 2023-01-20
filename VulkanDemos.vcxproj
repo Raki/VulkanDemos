@@ -21,12 +21,14 @@
   <ItemGroup>
     <ClCompile Include="Example0.cpp" />
     <ClCompile Include="utils\Utility.cpp" />
-    <ClCompile Include="utils\VkGLProgram.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="utils\CommonHeaders.h" />
     <ClInclude Include="utils\Utility.h" />
-    <ClInclude Include="utils\VkGLProgram.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="shaders\triangle-mvp.vert.glsl" />
+    <None Include="shaders\triangle.frag.glsl" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
