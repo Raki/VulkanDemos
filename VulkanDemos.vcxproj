@@ -27,6 +27,7 @@
     <ClInclude Include="utils\Utility.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="shaders\diffuse.vert.glsl" />
     <None Include="shaders\triangle-mvp.vert.glsl" />
     <None Include="shaders\triangle.frag.glsl" />
   </ItemGroup>

@@ -6,6 +6,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <array>
 #include <set>
 #include <optional>
 #include <limits> 
