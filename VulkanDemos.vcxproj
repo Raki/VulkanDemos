@@ -30,7 +30,10 @@
     <ClInclude Include="utils\VKUtility.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="shaders\diffuse.frag.glsl" />
     <None Include="shaders\diffuse.vert.glsl" />
+    <None Include="shaders\diffuseTex.frag.glsl" />
+    <None Include="shaders\diffuseTex.vert.glsl" />
     <None Include="shaders\triangle-mvp.vert.glsl" />
     <None Include="shaders\triangle.frag.glsl" />
   </ItemGroup>

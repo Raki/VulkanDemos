@@ -46,5 +46,14 @@
     <None Include="shaders\diffuse.vert.glsl">
       <Filter>shaders</Filter>
     </None>
+    <None Include="shaders\diffuse.frag.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\diffuseTex.frag.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\diffuseTex.vert.glsl">
+      <Filter>shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>
