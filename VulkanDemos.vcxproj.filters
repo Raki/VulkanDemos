@@ -15,8 +15,11 @@
     <ClCompile Include="utils\Utility.cpp">
       <Filter>utils</Filter>
     </ClCompile>
-    <ClCompile Include="Example0.cpp">
+    <ClCompile Include="Example2.cpp">
       <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="utils\VKUtility.cpp">
+      <Filter>utils</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -24,6 +27,12 @@
       <Filter>utils</Filter>
     </ClInclude>
     <ClInclude Include="utils\Utility.h">
+      <Filter>utils</Filter>
+    </ClInclude>
+    <ClInclude Include="utils\VKUtility.h">
+      <Filter>utils</Filter>
+    </ClInclude>
+    <ClInclude Include="utils\stb_image.h">
       <Filter>utils</Filter>
     </ClInclude>
   </ItemGroup>
