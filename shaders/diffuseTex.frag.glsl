@@ -45,18 +45,19 @@ void main()
 	material.shininess = 64.0;
 	material.specular = vec3(0.5);
 
-//	float ambientStrength = 0.1;
-//    vec3 lightColor = vec3(0.8,0.8,0.8);
-//    vec3 objectColor =  texture(texSampler, uv_out).xyz;//vec3(uv_out,0);
-//    vec3 ambient = ambientStrength * lightColor;
-//  	
-//    // diffuse 
-//    vec3 norm = normalize(nrml_out);
-//    vec3 lightDir = normalize(light.position - frag_pos);
-//    float diff = max(dot(norm, lightDir), 0.0);
-//    vec3 diffuse = diff * lightColor;
-//            
-//    vec3 result = (ambient + diffuse) * objectColor;
-    outColor = texture(texSampler, uv_out);
+	float ambientStrength = 0.1;
+    vec3 lightColor = vec3(0.8,0.8,0.8);
+    vec3 objectColor =  texture(texSampler, uv_out).xyz;//vec3(uv_out,0);
+    vec3 ambient = ambientStrength * lightColor;
+  	
+    // diffuse 
+    vec3 norm = normalize(nrml_out);
+    vec3 lightDir = normalize(light.position - frag_pos);
+    float diff = max(dot(norm, lightDir), 0.0);
+    vec3 diffuse = diff * lightColor;
+            
+    vec3 result = (ambient + diffuse) * objectColor;
+    //outColor = texture(texSampler, uv_out);
+    outColor = vec4(result,1);
 	
 }
