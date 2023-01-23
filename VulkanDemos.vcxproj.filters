@@ -15,11 +15,11 @@
     <ClCompile Include="utils\Utility.cpp">
       <Filter>utils</Filter>
     </ClCompile>
-    <ClCompile Include="Example2.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="utils\VKUtility.cpp">
       <Filter>utils</Filter>
+    </ClCompile>
+    <ClCompile Include="Example3.cpp">
+      <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
