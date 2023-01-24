@@ -253,7 +253,6 @@ void initVulkan()
     createCommandBuffers(device, commandPool);
     
     createDescriptorSetLayout();
-    createDepthResources();
     createImageTexture("img/vulkan.jpg");
     createTextureImageView();
     createTextureSampler();
