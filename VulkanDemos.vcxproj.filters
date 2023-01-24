@@ -18,7 +18,7 @@
     <ClCompile Include="utils\VKUtility.cpp">
       <Filter>utils</Filter>
     </ClCompile>
-    <ClCompile Include="Example3.cpp">
+    <ClCompile Include="Example4.cpp">
       <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>

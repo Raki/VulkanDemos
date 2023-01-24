@@ -220,6 +220,21 @@ namespace VKUtility
 
 		return cubeMesh;
 	}
+	std::shared_ptr<Mesh> getFSQuad()
+	{
+		std::vector<Vertex> vData = {
+			{glm::vec3(-1,-1,0),glm::vec3(0,0,1),glm::vec2(0,0)},
+			{glm::vec3(1,-1,0),glm::vec3(0,0,1),glm::vec2(1,0)},
+			{glm::vec3(1,1,0),glm::vec3(0,0,1),glm::vec2(1,1)},
+			{glm::vec3(-1,1,0),glm::vec3(0,0,1),glm::vec2(0,1)}
+		};
+		std::vector<uint16_t> iData = { 0,1,2,0,2,3 };
+
+		auto triMesh = std::make_shared<Mesh>(vData, iData);
+		triMesh->name = "Full screen quad";
+
+		return triMesh;
+	}
 	unsigned char* getImageData(std::string filename, int& width, int& height, int& nChannels,int reqChannels)
 	{
 		stbi_set_flip_vertically_on_load(1);
