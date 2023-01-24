@@ -1113,6 +1113,12 @@ void creatVertexAndIndexBuffers(VkDevice device,VkBuffer& vBuff, VkBuffer& iBuff
     vkCmdCopyBuffer(commandBuffer, iStageBuff, indexBuffer, 1, &copyRegionIndex);
 
     endSingleTimeCommands(commandBuffer);
+
+    vkDestroyBuffer(device, vStageBuff, nullptr);
+    vkFreeMemory(device, vStageBuffMemory, nullptr);
+
+    vkDestroyBuffer(device, iStageBuff, nullptr);
+    vkFreeMemory(device, iStageBuffMemory, nullptr);
 }
 void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
 {
