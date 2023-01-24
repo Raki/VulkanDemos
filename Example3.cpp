@@ -177,6 +177,7 @@ void createSyncObjects();
 
 VkBuffer createVertexBuffer(VkDevice device);
 VkBuffer createIndexBuffer(VkDevice device);
+void creatVertexAndIndexBuffers(VkDevice device, VkBuffer &vBuff,VkBuffer &iBuff);
 void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 
 void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
@@ -276,8 +277,7 @@ void initVulkan()
     vertices = cube->vData;
     indices = cube->iData;
 
-    createVertexBuffer(device);
-    createIndexBuffer(device);
+    creatVertexAndIndexBuffers(device, vertexBuffer, indexBuffer);
 
     
 }
@@ -1074,6 +1074,45 @@ VkBuffer createIndexBuffer(VkDevice device)
     vkFreeMemory(device, stagingBufferMem, nullptr);
 
     return indexBuffer;
+}
+void creatVertexAndIndexBuffers(VkDevice device,VkBuffer& vBuff, VkBuffer& iBuff)
+{
+    //size of buffers
+    VkDeviceSize vBuffSize = sizeof(Vertex) * vertices.size();
+    VkDeviceSize iBuffSize = sizeof(uint16_t) * indices.size();
+
+    //staging buffer
+    VkBuffer vStageBuff, iStageBuff;
+    VkDeviceMemory vStageBuffMemory, iStageBuffMemory;
+
+    createBuffer(vBuffSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, vStageBuff, vStageBuffMemory);
+    void* data;
+    vkMapMemory(device, vStageBuffMemory, 0, vBuffSize, 0, &data);
+    memcpy(data, vertices.data(), (size_t)vBuffSize);
+    vkUnmapMemory(device, vStageBuffMemory);
+    
+    createBuffer(iBuffSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, iStageBuff, iStageBuffMemory);
+    void* iData;
+    vkMapMemory(device, iStageBuffMemory, 0, iBuffSize, 0, &iData);
+    memcpy(iData, indices.data(), (size_t)iBuffSize);
+    vkUnmapMemory(device, iStageBuffMemory);
+
+    //create device memory backed buffer
+    createBuffer(vBuffSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
+    createBuffer(iBuffSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
+
+    //transfer memory from staging to device memory backed buffer
+
+    VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+
+    VkBufferCopy copyRegion{}, copyRegionIndex{};
+    copyRegion.size = vBuffSize;
+    copyRegionIndex.size = iBuffSize;
+
+    vkCmdCopyBuffer(commandBuffer, vStageBuff, vertexBuffer, 1, &copyRegion);
+    vkCmdCopyBuffer(commandBuffer, iStageBuff, indexBuffer, 1, &copyRegionIndex);
+
+    endSingleTimeCommands(commandBuffer);
 }
 void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
 {
