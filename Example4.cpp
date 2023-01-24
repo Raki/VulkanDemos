@@ -224,7 +224,7 @@ void createWindow()
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-    window = glfwCreateWindow(WIN_WIDTH, WIN_HEIGHT, "Vulkan Example2", NULL, NULL);
+    window = glfwCreateWindow(WIN_WIDTH, WIN_HEIGHT, "Vulkan Example4", NULL, NULL);
     glfwSetKeyCallback(window, key_callback);
 }
 void initVulkan()
