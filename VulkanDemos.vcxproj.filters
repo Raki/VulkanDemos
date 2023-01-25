@@ -18,8 +18,11 @@
     <ClCompile Include="utils\VKUtility.cpp">
       <Filter>utils</Filter>
     </ClCompile>
-    <ClCompile Include="Example4.cpp">
+    <ClCompile Include="Example5.cpp">
       <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="utils\VKBackend.cpp">
+      <Filter>utils</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -33,6 +36,9 @@
       <Filter>utils</Filter>
     </ClInclude>
     <ClInclude Include="utils\stb_image.h">
+      <Filter>utils</Filter>
+    </ClInclude>
+    <ClInclude Include="utils\VKBackend.h">
       <Filter>utils</Filter>
     </ClInclude>
   </ItemGroup>
