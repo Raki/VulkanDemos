@@ -4,6 +4,7 @@
 
 #include "CommonHeaders.h"
 #include "Utility.h"
+#include "VKUtility.h"
 
 namespace VKBackend
 {
@@ -21,6 +22,15 @@ namespace VKBackend
 		std::vector<VkSurfaceFormatKHR> formats;
 		std::vector<VkPresentModeKHR> presentModes;
 	};
+
+	struct VKTexture
+	{
+		VkImage textureImage;
+		VkDeviceMemory textureImageMemory;
+		VkImageView textureImageView;
+		VkSampler textureSampler;
+	};
+
 
 	extern VkInstance vkInstance;
 	extern VkSurfaceKHR surface;
@@ -78,6 +88,14 @@ namespace VKBackend
 	void createSyncObjects();
 	void createBuffer(VkDeviceSize size, VkBufferUsageFlags usageFlag, VkMemoryPropertyFlags props, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
 	uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+	std::shared_ptr<VKTexture> createVKTexture(std::string filename);
+	void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory);
+	void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
+	VkCommandBuffer beginSingleTimeCommands();
+	void endSingleTimeCommands(VkCommandBuffer commandBuffer);
+	void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
+	VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
+	void createTextureSampler(VkSampler& textureSampler);
 }
 
 
