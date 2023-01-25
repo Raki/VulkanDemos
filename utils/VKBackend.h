@@ -3,9 +3,25 @@
 #define VK_BACKEND_H
 
 #include "CommonHeaders.h"
+#include "Utility.h"
 
 namespace VKBackend
 {
+	struct QueueFamilyIndices {
+		std::optional<uint32_t> graphicsFamily;
+		std::optional<uint32_t> presentFamily;
+
+		bool isComplete() {
+			return graphicsFamily.has_value() && presentFamily.has_value();
+		}
+	};
+
+	struct SwapChainSupportDetails {
+		VkSurfaceCapabilitiesKHR capabilities;
+		std::vector<VkSurfaceFormatKHR> formats;
+		std::vector<VkPresentModeKHR> presentModes;
+	};
+
 	extern VkInstance vkInstance;
 	extern VkSurfaceKHR surface;
 	extern VkPhysicalDevice physicalDevice;
@@ -38,8 +54,31 @@ namespace VKBackend
 	extern std::vector<VkSemaphore> renderFinishedSemaphores;
 	extern std::vector<VkFence> inFlightFences;
 
+	extern int winWidth;
+	extern int winHeight;
+	extern int MAX_FRAMES_IN_FLIGHT;
 
 	VkInstance createVulkanInstance();
+	VkPhysicalDevice pickPhysicalDevice(VkInstance instance);
+	QueueFamilyIndices pickDeviceQueueFamily(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface);
+	VkDevice createDevice(VkPhysicalDevice physicalDevice);
+	SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
+	VkSwapchainKHR createSwapchain(VkDevice device, VkSurfaceKHR surface);
+	VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
+	VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
+	void createSwapchainImageViews();
+	VkRenderPass createRenerPass(VkDevice device);
+	VkShaderModule loadShader(VkDevice device, std::string path);
+	void createDescriptorSetLayout();
+	void createDescriptorPool(VkDevice device);
+	VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
+	VkFormat findDepthFormat();
+	VkCommandPool createCommandPool(VkDevice device);
+	void createCommandBuffers(VkDevice device, VkCommandPool commandPool);
+	void createSyncObjects();
+	void createBuffer(VkDeviceSize size, VkBufferUsageFlags usageFlag, VkMemoryPropertyFlags props, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
+	uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 }
+
 
 #endif // !VK_BACKEND_H
