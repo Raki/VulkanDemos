@@ -2,7 +2,7 @@
 #define VK_UTILITY_H
 
 #include "CommonHeaders.h"
-
+#include "bezier.h"
 
 namespace VKUtility
 {
@@ -13,6 +13,7 @@ namespace VKUtility
         glm::vec3 normal;
         glm::vec2 uv;
         static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions();
+        static VkVertexInputBindingDescription getBindingDescription();
     };
 
 	struct Mesh

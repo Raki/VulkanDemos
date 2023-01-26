@@ -284,6 +284,17 @@ namespace VKUtility
 
 		return attributeDescriptions;
 	}
+
+	VkVertexInputBindingDescription Vertex::getBindingDescription()
+	{
+		VkVertexInputBindingDescription description;
+		description.binding = 0;
+		description.stride = sizeof(Vertex);
+		description.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+		return description;
+	}
+
 	Mesh::Mesh(std::vector<Vertex> vData, std::vector<uint16_t> iData)
 	{
 		this->vData = vData;

@@ -19,12 +19,15 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Example5.cpp" />
+    <ClCompile Include="Example6.cpp" />
+    <ClCompile Include="utils\Colors.cpp" />
     <ClCompile Include="utils\Utility.cpp" />
     <ClCompile Include="utils\VKBackend.cpp" />
     <ClCompile Include="utils\VKUtility.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="utils\bezier.h" />
+    <ClInclude Include="utils\Colors.h" />
     <ClInclude Include="utils\CommonHeaders.h" />
     <ClInclude Include="utils\stb_image.h" />
     <ClInclude Include="utils\Utility.h" />
