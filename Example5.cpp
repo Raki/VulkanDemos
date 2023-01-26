@@ -174,12 +174,48 @@ void initVulkan()
     VKBackend::commandPool = VKBackend::createCommandPool(VKBackend::device);
     VKBackend::createCommandBuffers(VKBackend::device, VKBackend::commandPool);
     
-    VKBackend::createDescriptorSetLayout();
+    VkDescriptorSetLayoutBinding uboLayoutBinding;
+    uboLayoutBinding.binding = 0;
+    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uboLayoutBinding.descriptorCount = 1;
+    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    uboLayoutBinding.pImmutableSamplers = nullptr;
+
+    VkDescriptorSetLayoutBinding samplerLayoutBinding;
+    samplerLayoutBinding.binding = 1;
+    samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    samplerLayoutBinding.descriptorCount = 1;
+    samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    samplerLayoutBinding.pImmutableSamplers = nullptr;
+
+    VkDescriptorSetLayoutBinding samplerLayoutBinding2;
+    samplerLayoutBinding2.binding = 2;
+    samplerLayoutBinding2.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    samplerLayoutBinding2.descriptorCount = 1;
+    samplerLayoutBinding2.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    samplerLayoutBinding2.pImmutableSamplers = nullptr;
+
+    std::vector<VkDescriptorSetLayoutBinding> layoutBindings = { uboLayoutBinding ,samplerLayoutBinding ,samplerLayoutBinding2 };
+    VKBackend::createDescriptorSetLayout(layoutBindings);
     
     texture0 = VKBackend::createVKTexture("img/sample.jpg");
     texture = VKBackend::createVKTexture("img/sample2.jpg");
     createUniformBuffers();
-    VKBackend::createDescriptorPool(VKBackend::device);
+    
+    VkDescriptorPoolSize poolSize;
+    poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSize.descriptorCount = static_cast<uint32_t>(VKBackend::swapchainMinImageCount);
+
+    VkDescriptorPoolSize poolSizeSampler;
+    poolSizeSampler.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    poolSizeSampler.descriptorCount = static_cast<uint32_t>(VKBackend::swapchainMinImageCount);
+
+    VkDescriptorPoolSize poolSizeSampler2;
+    poolSizeSampler2.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    poolSizeSampler2.descriptorCount = static_cast<uint32_t>(VKBackend::swapchainMinImageCount);
+
+    std::vector<VkDescriptorPoolSize> poolsizes = { poolSize,poolSizeSampler,poolSizeSampler2 };
+    VKBackend::createDescriptorPool(VKBackend::device,poolsizes);
     createDescriptorSets(VKBackend::device);
 
     VKBackend::graphicsPipeline = createGraphicsPipeline(VKBackend::device, VKBackend::renderPass, triangleVS, triangleFS);

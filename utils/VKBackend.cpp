@@ -407,61 +407,26 @@ namespace VKBackend
 
 		return shaderModule;
 	}
-	void createDescriptorSetLayout()
+
+	void createDescriptorSetLayout(std::vector <VkDescriptorSetLayoutBinding> layoutBindings)
 	{
 		VkDescriptorSetLayoutCreateInfo createInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-
-		VkDescriptorSetLayoutBinding uboLayoutBinding;
-		uboLayoutBinding.binding = 0;
-		uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		uboLayoutBinding.descriptorCount = 1;
-		uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-		uboLayoutBinding.pImmutableSamplers = nullptr;
-
-		VkDescriptorSetLayoutBinding samplerLayoutBinding;
-		samplerLayoutBinding.binding = 1;
-		samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		samplerLayoutBinding.descriptorCount = 1;
-		samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		samplerLayoutBinding.pImmutableSamplers = nullptr;
-
-		VkDescriptorSetLayoutBinding samplerLayoutBinding2;
-		samplerLayoutBinding2.binding = 2;
-		samplerLayoutBinding2.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		samplerLayoutBinding2.descriptorCount = 1;
-		samplerLayoutBinding2.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		samplerLayoutBinding2.pImmutableSamplers = nullptr;
-
-		std::array<VkDescriptorSetLayoutBinding, 3> layoutBindings = { uboLayoutBinding,samplerLayoutBinding,samplerLayoutBinding2 };
-
-		createInfo.bindingCount = 3;
+		createInfo.bindingCount = static_cast<uint32_t>(layoutBindings.size());
 		createInfo.pBindings = layoutBindings.data();
 		VK_CHECK(vkCreateDescriptorSetLayout(VKBackend::device, &createInfo, nullptr, &VKBackend::descriptorSetLayout));
 	}
-	void createDescriptorPool(VkDevice device)
+
+	void createDescriptorPool(VkDevice device, std::vector<VkDescriptorPoolSize> poolsizes)
 	{
 		VkDescriptorPoolCreateInfo createInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
 
-		VkDescriptorPoolSize poolSize;
-		poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		poolSize.descriptorCount = static_cast<uint32_t>(VKBackend::swapchainMinImageCount);
-
-		VkDescriptorPoolSize poolSizeSampler;
-		poolSizeSampler.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		poolSizeSampler.descriptorCount = static_cast<uint32_t>(VKBackend::swapchainMinImageCount);
-
-		VkDescriptorPoolSize poolSizeSampler2;
-		poolSizeSampler2.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		poolSizeSampler2.descriptorCount = static_cast<uint32_t>(VKBackend::swapchainMinImageCount);
-
-		std::array<VkDescriptorPoolSize, 3> poolsizes = { poolSize,poolSizeSampler,poolSizeSampler2 };
-
-		createInfo.poolSizeCount = 3;
+		createInfo.poolSizeCount = static_cast<uint32_t>(poolsizes.size());;
 		createInfo.pPoolSizes = poolsizes.data();
 		createInfo.maxSets = static_cast<uint32_t>(VKBackend::swapchainMinImageCount);
 
 		VK_CHECK(vkCreateDescriptorPool(device, &createInfo, nullptr, &VKBackend::descriptorPool));
 	}
+
 	VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features)
 	{
 		for (VkFormat format : candidates) {

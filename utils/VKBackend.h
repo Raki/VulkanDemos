@@ -79,8 +79,8 @@ namespace VKBackend
 	void createSwapchainImageViews();
 	VkRenderPass createRenerPass(VkDevice device);
 	VkShaderModule loadShader(VkDevice device, std::string path);
-	void createDescriptorSetLayout();
-	void createDescriptorPool(VkDevice device);
+	void createDescriptorSetLayout(std::vector <VkDescriptorSetLayoutBinding> layoutBindings);
+	void createDescriptorPool(VkDevice device, std::vector<VkDescriptorPoolSize> poolsizes);
 	VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
 	VkFormat findDepthFormat();
 	VkCommandPool createCommandPool(VkDevice device);
