@@ -19,3 +19,9 @@ Sample to create and display texture in Vulkan
 Using two textures in vulkan.
 
 ![image](https://user-images.githubusercontent.com/824691/214445964-7581145f-ce46-4cee-acbe-eb072323cab2.png)
+
+* Example 6
+
+Bezier multi-color curve
+
+![image](https://user-images.githubusercontent.com/824691/214755847-447c5012-6970-42a2-9577-fa89b8927462.png)
