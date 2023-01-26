@@ -22,6 +22,6 @@ Using two textures in vulkan.
 
 * Example 6
 
-Bezier multi-color curve
+Bezier multi-color curve with msaa
 
-![image](https://user-images.githubusercontent.com/824691/214755847-447c5012-6970-42a2-9577-fa89b8927462.png)
+![image](https://user-images.githubusercontent.com/824691/214947311-29f22971-7f92-40f2-bea2-901aa7b1a29b.png)
