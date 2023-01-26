@@ -137,6 +137,8 @@ VkDeviceMemory indexBufferMemory;
 VkImage depthImage;
 VkDeviceMemory depthImageMemory;
 VkImageView depthImageView;
+
+std::shared_ptr<VKBackend::VKRenderTarget> msColorAttch;
 #pragma endregion vars
 
 #pragma region prototypes
@@ -155,6 +157,7 @@ void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
 void updateUniformBuffer(uint32_t currentImage);
 void createDepthResources();
+void createColorResource();
 #pragma endregion prototypes
 
 #pragma region functions
@@ -182,7 +185,7 @@ void createWindow()
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-    window = glfwCreateWindow(WIN_WIDTH, WIN_HEIGHT, "Vulkan Example5", NULL, NULL);
+    window = glfwCreateWindow(WIN_WIDTH, WIN_HEIGHT, "Vulkan Example6", NULL, NULL);
     glfwSetKeyCallback(window, key_callback);
 }
 void initVulkan()
@@ -242,6 +245,7 @@ void initVulkan()
     vkDestroyShaderModule(VKBackend::device, triangleVS, nullptr);
     vkDestroyShaderModule(VKBackend::device, triangleFS, nullptr);
 
+    createColorResource();
     createDepthResources();
     createFramebuffers();
 
@@ -339,6 +343,10 @@ void destroyVulkan()
     vkDestroyImageView(VKBackend::device, depthImageView, nullptr);
     vkDestroyImage(VKBackend::device, depthImage, nullptr);
     vkFreeMemory(VKBackend::device, depthImageMemory, nullptr);
+
+    vkDestroyImageView(VKBackend::device,msColorAttch->colorImageView, nullptr);
+    vkDestroyImage(VKBackend::device, msColorAttch->colorImage, nullptr);
+    vkFreeMemory(VKBackend::device, msColorAttch->colorImageMemory, nullptr);
 
     for (size_t i = 0; i < VKBackend::swapchainMinImageCount; i++)
     {
@@ -481,7 +489,7 @@ VkPipeline createGraphicsPipeline(VkDevice device, VkRenderPass renderPass, VkSh
     VkPipelineMultisampleStateCreateInfo multisampling{};
     multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     multisampling.sampleShadingEnable = VK_FALSE;
-    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    multisampling.rasterizationSamples = VKBackend::msaaSamples;
 
     VkPipelineDepthStencilStateCreateInfo depthStencil{};
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
@@ -563,9 +571,10 @@ void createFramebuffers()
             swapChainImageViews[i]
         };*/
 
-        std::array<VkImageView, 2> attachments = {
-            VKBackend::swapChainImageViews[i],
-            depthImageView
+        std::array<VkImageView, 3> attachments = {
+            msColorAttch->colorImageView,
+            depthImageView,
+            VKBackend::swapChainImageViews[i]
         };
 
         VkFramebufferCreateInfo framebufferInfo{};
@@ -769,8 +778,17 @@ void createDepthResources()
 {
     VkFormat depthFormat = VKBackend::findDepthFormat();
 
-    VKBackend::createImage(VKBackend::swapChainExtent.width, VKBackend::swapChainExtent.height, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthImage, depthImageMemory);
+    VKBackend::createImage(VKBackend::swapChainExtent.width, VKBackend::swapChainExtent.height, VKBackend::msaaSamples, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthImage, depthImageMemory);
     depthImageView = VKBackend::createImageView(depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+}
+
+void createColorResource()
+{
+    VkFormat colorFormat = VKBackend::swapChainImageFormat;
+    msColorAttch = std::make_shared<VKBackend::VKRenderTarget>();
+
+    VKBackend::createImage(VKBackend::swapChainExtent.width, VKBackend::swapChainExtent.height, VKBackend::msaaSamples, colorFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,msColorAttch->colorImage, msColorAttch->colorImageMemory);
+    msColorAttch->colorImageView = VKBackend::createImageView(msColorAttch->colorImage, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT);
 }
 #pragma endregion functions
 

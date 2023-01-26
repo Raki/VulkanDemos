@@ -31,6 +31,12 @@ namespace VKBackend
 		VkSampler textureSampler;
 	};
 
+	struct VKRenderTarget
+	{
+		VkImage colorImage;
+		VkDeviceMemory colorImageMemory;
+		VkImageView colorImageView;
+	};
 
 	extern VkInstance vkInstance;
 	extern VkSurfaceKHR surface;
@@ -64,6 +70,8 @@ namespace VKBackend
 	extern std::vector<VkSemaphore> renderFinishedSemaphores;
 	extern std::vector<VkFence> inFlightFences;
 
+	extern VkSampleCountFlagBits msaaSamples;
+
 	extern int winWidth;
 	extern int winHeight;
 	extern int MAX_FRAMES_IN_FLIGHT;
@@ -89,13 +97,15 @@ namespace VKBackend
 	void createBuffer(VkDeviceSize size, VkBufferUsageFlags usageFlag, VkMemoryPropertyFlags props, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
 	uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 	std::shared_ptr<VKTexture> createVKTexture(std::string filename);
-	void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory);
+	void createImage(uint32_t width, uint32_t height, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory);
 	void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
 	VkCommandBuffer beginSingleTimeCommands();
 	void endSingleTimeCommands(VkCommandBuffer commandBuffer);
 	void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 	VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
 	void createTextureSampler(VkSampler& textureSampler);
+
+	VkSampleCountFlagBits getMaxUsableSampleCount();
 }
 
 
