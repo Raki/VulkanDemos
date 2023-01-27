@@ -25,3 +25,9 @@ Using two textures in vulkan.
 Bezier multi-color curve with msaa
 
 ![image](https://user-images.githubusercontent.com/824691/214947311-29f22971-7f92-40f2-bea2-901aa7b1a29b.png)
+
+* Example 7
+
+Rounded rectangle
+
+![image](https://user-images.githubusercontent.com/824691/214994906-4ae48f32-dcd9-4c10-8037-60339d015f49.png)
