@@ -3,6 +3,7 @@
 
 #include "CommonHeaders.h"
 #include "bezier.h"
+#include <poly2tri/poly2tri.h>
 
 namespace VKUtility
 {

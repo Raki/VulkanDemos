@@ -21,11 +21,11 @@
     <ClCompile Include="utils\VKBackend.cpp">
       <Filter>utils</Filter>
     </ClCompile>
-    <ClCompile Include="Example6.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="utils\Colors.cpp">
       <Filter>utils</Filter>
+    </ClCompile>
+    <ClCompile Include="Example7.cpp">
+      <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
