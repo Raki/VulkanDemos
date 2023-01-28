@@ -60,8 +60,10 @@ struct UniformBufferObject
 
 struct VKMesh
 {
+    glm::vec3 rOrigin=glm::vec3(0);
     std::vector<uint16_t> indices;
-    glm::mat4 tMatrix;
+    glm::mat4 rMatrix=glm::mat4(1);
+    glm::mat4 tMatrix=glm::mat4(1);
     VkBuffer vertexBuffer;
     VkDeviceMemory vertexBufferMemory;
     VkBuffer indexBuffer;
@@ -135,6 +137,7 @@ VkImageView depthImageView;
 
 std::shared_ptr<VKBackend::VKRenderTarget> msColorAttch;
 std::vector<std::shared_ptr<VKMesh2D>> shapes;
+std::shared_ptr<VKMesh2D> hand;
 #pragma endregion vars
 
 #pragma region prototypes
@@ -152,7 +155,7 @@ void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
 void updateUniformBuffer(uint32_t currentImage);
 void createDepthResources();
 void createColorResource();
-void createCircle(float radius,std::vector<VDPosColor> &verts,std::vector<uint16_t> &indices);
+void createCircle(float radius,float depth,glm::vec3 color,std::vector<VDPosColor> &verts,std::vector<uint16_t> &indices);
 void createPolyline(std::vector<VDPosColor>& verts, std::vector<uint16_t>& indices);
 void createRoundedRect(float w,float h,float depth,float rad,glm::vec3 color,std::vector<VDPosColor>& verts, std::vector<uint16_t>& indices);
 void setupScene();
@@ -223,7 +226,6 @@ void initVulkan()
     uboLayoutBinding.descriptorCount = 1;
     uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
     uboLayoutBinding.pImmutableSamplers = nullptr;
-    
 
     std::vector<VkDescriptorSetLayoutBinding> layoutBindings = { uboLayoutBinding };
     VKBackend::createDescriptorSetLayout(layoutBindings);
@@ -247,21 +249,7 @@ void initVulkan()
     createDepthResources();
     createFramebuffers();
 
-    
-
     VKBackend::createSyncObjects();
-
-    auto polyline = std::make_shared<VKMesh2D>();
-    createRoundedRect(4.f-0.04f, 0.5f-0.04f,0.f, 0.1f,Color::white, polyline->vertices, polyline->indices);
-    polyline->createBuffers(VKBackend::device);
-    polyline->tMatrix = glm::mat4(1);
-    shapes.push_back(polyline);
-
-    auto circle = std::make_shared<VKMesh2D>();
-    createRoundedRect(4.f, 0.5f,0.f,0.1f, Color::skyBlue, circle->vertices ,circle->indices);
-    circle->createBuffers(VKBackend::device);
-    circle->tMatrix = glm::mat4(1);
-    shapes.push_back(circle);
 
     setupScene();
     
@@ -638,7 +626,7 @@ void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex)
         VkDeviceSize offsets[] = { 0 };
 
         PushConstant pConstant;
-        pConstant.tMat = shape->tMatrix;
+        pConstant.tMat = shape->rMatrix*shape->tMatrix;
 
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
         vkCmdBindIndexBuffer(commandBuffer, shape->indexBuffer, 0, VK_INDEX_TYPE_UINT16);
@@ -661,7 +649,7 @@ void updateUniformBuffer(uint32_t currentImage)
     float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
     UniformBufferObject ubo;
-    ubo.proj = glm::ortho(-4.0f,4.0f,-4.0f,4.0f,-4.0f,4.0f);
+    ubo.proj = glm::ortho(-4.0f,4.0f,-4.0f,4.0f,-4.f,4.0f);
     ubo.proj[1][1] *= -1;
 
     void* data;
@@ -685,7 +673,7 @@ void createColorResource()
     msColorAttch->colorImageView = VKBackend::createImageView(msColorAttch->colorImage, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT);
 }
 
-void createCircle(float radius, std::vector<VDPosColor>& verts, std::vector<uint16_t>& indices)
+void createCircle(float radius, float depth, glm::vec3 color, std::vector<VDPosColor>& verts, std::vector<uint16_t>& indices)
 {
     auto appendMod = (verts.size() > 0);
     
@@ -706,7 +694,7 @@ void createCircle(float radius, std::vector<VDPosColor>& verts, std::vector<uint
         for (int i = 0; i < 3; i++)
         {
             auto pt = tri->GetPoint(i);
-            VDPosColor vertex{glm::vec3(pt->x,pt->y,0),Color::purple};
+            VDPosColor vertex{glm::vec3(pt->x,pt->y,depth),color};
             verts.push_back(vertex);
             if(appendMod)
                 indices.push_back(static_cast<uint16_t>(verts.size()-1));
@@ -848,22 +836,23 @@ void createRoundedRect(float w, float h,float depth,float rad, glm::vec3 color, 
 }
 void setupScene()
 {
-    //ToDo: Possible optimisation, pack the vertex and index data of all round tects into single buffer
-    srand(time(NULL));
-    for (size_t i = 0; i < 20; i++)
-    {
-        auto w = 1+rand() % 3;
-        auto h = 0.5f+ rand() % 2;
-        float x = rand() % 64;
-        float y = rand() % 64 ;
-        x = -4 + (x / 8.0f);
-        y = -4 + (y / 8.0f);
-        auto shape = std::make_shared<VKMesh2D>();
-        createRoundedRect(w,h, 0.f, 0.1f, Color::colrArr[i%Color::totalColors], shape->vertices, shape->indices);
-        shape->createBuffers(VKBackend::device);
-        shape->tMatrix = glm::translate(glm::mat4(1), glm::vec3(x, y, 0));
-        shapes.push_back(shape);
-    }
+    hand = std::make_shared<VKMesh2D>();
+    createRoundedRect(0.8, 0.1, 0, 0.05, Color::purple, hand->vertices, hand->indices);
+    hand->createBuffers(VKBackend::device);
+    hand->tMatrix = glm::translate(glm::mat4(1),glm::vec3(0.4f, 0, 0));
+    hand->rMatrix = glm::rotate(glm::mat4(1), glm::radians(45.0f), glm::vec3(0, 0, 1));
+    shapes.push_back(hand);
+
+    auto outerCircle = std::make_shared<VKMesh2D>();
+    createCircle(0.1, 0, Color::lightLavender, outerCircle->vertices, outerCircle->indices);
+    createCircle(0.9, 0, Color::white, outerCircle->vertices, outerCircle->indices);
+    createCircle(1,0,Color::purple, outerCircle->vertices, outerCircle->indices);
+    outerCircle->createBuffers(VKBackend::device);
+    outerCircle->tMatrix = glm::mat4(1);
+    shapes.push_back(outerCircle);
+
+    
+    
 }
 
 #pragma endregion functions
@@ -873,6 +862,7 @@ int main()
     createWindow();
     initVulkan();
 
+    static float th = 0;
     uint32_t currentFrame = 0;
     while (!glfwWindowShouldClose(window))
     {
@@ -884,7 +874,8 @@ int main()
         uint32_t imageIndex;
         vkAcquireNextImageKHR(VKBackend::device, VKBackend::swapchain, UINT64_MAX, VKBackend::imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
         vkResetCommandBuffer(VKBackend::commandBuffers[currentFrame], 0);
-
+        th += 0.5;
+        hand->rMatrix = glm::rotate(glm::mat4(1), glm::radians(th), glm::vec3(0, 0, 1));
         recordCommandBuffer(VKBackend::commandBuffers[currentFrame], imageIndex);
 
         updateUniformBuffer(imageIndex);
