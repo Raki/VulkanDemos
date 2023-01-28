@@ -28,6 +28,6 @@ Bezier multi-color curve with msaa
 
 * Example 7
 
-Rounded rectangle
+Push constants
 
-![image](https://user-images.githubusercontent.com/824691/214994906-4ae48f32-dcd9-4c10-8037-60339d015f49.png)
+![image](https://user-images.githubusercontent.com/824691/215241139-d2236ec4-ded0-44c3-b2d8-2cf3dc622d06.png)
