@@ -39,6 +39,8 @@
     <None Include="shaders\diffuse.vert.glsl" />
     <None Include="shaders\diffuseTex.frag.glsl" />
     <None Include="shaders\diffuseTex.vert.glsl" />
+    <None Include="shaders\solidShapes.frag.glsl" />
+    <None Include="shaders\solidShapes.vert.glsl" />
     <None Include="shaders\triangle-mvp.vert.glsl" />
     <None Include="shaders\triangle.frag.glsl" />
   </ItemGroup>

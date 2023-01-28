@@ -61,6 +61,7 @@ struct UniformBufferObject
 struct VKMesh
 {
     std::vector<uint16_t> indices;
+    glm::mat4 tMatrix;
     VkBuffer vertexBuffer;
     VkDeviceMemory vertexBufferMemory;
     VkBuffer indexBuffer;
@@ -117,6 +118,10 @@ struct VKMesh2D : VKMesh
     }
 };
 
+struct PushConstant
+{
+    glm::mat4 tMat;
+};
 
 std::vector<VkBuffer> uniformBuffers;
 std::vector<VkDeviceMemory> uniformBufferMemories;
@@ -129,7 +134,7 @@ VkDeviceMemory depthImageMemory;
 VkImageView depthImageView;
 
 std::shared_ptr<VKBackend::VKRenderTarget> msColorAttch;
-std::shared_ptr<VKMesh2D> circle=nullptr,polyline=nullptr;
+std::vector<std::shared_ptr<VKMesh2D>> shapes;
 #pragma endregion vars
 
 #pragma region prototypes
@@ -142,8 +147,6 @@ void createUniformBuffers();
 void createDescriptorSets(VkDevice device);
 VkPipeline createGraphicsPipeline(VkDevice device, VkRenderPass renderPass, VkShaderModule vsModule, VkShaderModule fsModule);
 void createFramebuffers();
-//void creatVertexAndIndexBuffers(VkDevice device, VkBuffer &vBuff,VkBuffer &iBuff);
-void creatSSVertexAndIndexBuffers(VkDevice device, VkBuffer& vBuff, VkBuffer& iBuff);
 void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
 void updateUniformBuffer(uint32_t currentImage);
@@ -152,6 +155,7 @@ void createColorResource();
 void createCircle(float radius,std::vector<VDPosColor> &verts,std::vector<uint16_t> &indices);
 void createPolyline(std::vector<VDPosColor>& verts, std::vector<uint16_t>& indices);
 void createRoundedRect(float w,float h,float depth,float rad,glm::vec3 color,std::vector<VDPosColor>& verts, std::vector<uint16_t>& indices);
+void setupScene();
 #pragma endregion prototypes
 
 #pragma region functions
@@ -247,13 +251,19 @@ void initVulkan()
 
     VKBackend::createSyncObjects();
 
-    polyline = std::make_shared<VKMesh2D>();
+    auto polyline = std::make_shared<VKMesh2D>();
     createRoundedRect(4.f-0.04f, 0.5f-0.04f,0.f, 0.1f,Color::white, polyline->vertices, polyline->indices);
     polyline->createBuffers(VKBackend::device);
+    polyline->tMatrix = glm::mat4(1);
+    shapes.push_back(polyline);
 
-    circle = std::make_shared<VKMesh2D>();
+    auto circle = std::make_shared<VKMesh2D>();
     createRoundedRect(4.f, 0.5f,0.f,0.1f, Color::skyBlue, circle->vertices ,circle->indices);
     circle->createBuffers(VKBackend::device);
+    circle->tMatrix = glm::mat4(1);
+    shapes.push_back(circle);
+
+    setupScene();
     
 }
 void destroyVulkan()
@@ -281,20 +291,21 @@ void destroyVulkan()
 
     vkDestroySwapchainKHR(VKBackend::device, VKBackend::swapchain, nullptr);
 
-    if(polyline!=nullptr)
+    /*if(polyline!=nullptr)
     {
         vkDestroyBuffer(VKBackend::device, polyline->vertexBuffer, nullptr);
         vkFreeMemory(VKBackend::device, polyline->vertexBufferMemory, nullptr);
         vkDestroyBuffer(VKBackend::device, polyline->indexBuffer, nullptr);
         vkFreeMemory(VKBackend::device, polyline->indexBufferMemory, nullptr);
-    }
+    }*/
 
-    if (circle != nullptr)
+    //if (circle != nullptr)
+    for(auto shape : shapes)
     {
-        vkDestroyBuffer(VKBackend::device, circle->vertexBuffer, nullptr);
-        vkFreeMemory(VKBackend::device, circle->vertexBufferMemory, nullptr);
-        vkDestroyBuffer(VKBackend::device, circle->indexBuffer, nullptr);
-        vkFreeMemory(VKBackend::device, circle->indexBufferMemory, nullptr);
+        vkDestroyBuffer(VKBackend::device, shape->vertexBuffer, nullptr);
+        vkFreeMemory(VKBackend::device, shape->vertexBufferMemory, nullptr);
+        vkDestroyBuffer(VKBackend::device, shape->indexBuffer, nullptr);
+        vkFreeMemory(VKBackend::device, shape->indexBufferMemory, nullptr);
     }
 
     /*vkDestroySampler(VKBackend::device, texture0->textureSampler, nullptr);
@@ -491,12 +502,17 @@ VkPipeline createGraphicsPipeline(VkDevice device, VkRenderPass renderPass, VkSh
     dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
     dynamicState.pDynamicStates = dynamicStates.data();
 
+    VkPushConstantRange pushConstant;
+    pushConstant.offset = 0;
+    pushConstant.size = sizeof(PushConstant);
+    pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = &VKBackend::descriptorSetLayout;
-    pipelineLayoutInfo.pushConstantRangeCount = 0;
+    pipelineLayoutInfo.pPushConstantRanges = &pushConstant;
+    pipelineLayoutInfo.pushConstantRangeCount = 1;
 
     if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &VKBackend::pipelineLayout) != VK_SUCCESS) {
         throw std::runtime_error("failed to create pipeline layout!");
@@ -615,18 +631,21 @@ void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex)
     scissor.extent = VKBackend::swapChainExtent;
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-    VkBuffer vertexBuffers[] = { polyline->vertexBuffer };
-    VkDeviceSize offsets[] = { 0 };
-
-    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-    vkCmdBindIndexBuffer(commandBuffer, polyline->indexBuffer, 0, VK_INDEX_TYPE_UINT16);
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, VKBackend::pipelineLayout, 0, 1, &VKBackend::descriptorSets[imageIndex], 0, nullptr);
-    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(polyline->indices.size()), 1, 0, 0, 0);
+    for (const auto shape : shapes)
+    {
+        VkBuffer vertexBuffers[] = { shape->vertexBuffer };
+        VkDeviceSize offsets[] = { 0 };
 
-    vertexBuffers[0] = circle->vertexBuffer;
-    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-    vkCmdBindIndexBuffer(commandBuffer, circle->indexBuffer, 0, VK_INDEX_TYPE_UINT16);
-    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(circle->indices.size()), 1, 0, 0, 0);
+        PushConstant pConstant;
+        pConstant.tMat = shape->tMatrix;
+
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+        vkCmdBindIndexBuffer(commandBuffer, shape->indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, VKBackend::pipelineLayout, 0, 1, &VKBackend::descriptorSets[imageIndex], 0, nullptr);
+        vkCmdPushConstants(commandBuffer, VKBackend::pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant), &pConstant);
+        vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(shape->indices.size()), 1, 0, 0, 0);
+    }
 
     vkCmdEndRenderPass(commandBuffer);
 
@@ -642,7 +661,6 @@ void updateUniformBuffer(uint32_t currentImage)
     float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
     UniformBufferObject ubo;
-    //ubo.proj = glm::mat4(1.0f);
     ubo.proj = glm::ortho(-4.0f,4.0f,-4.0f,4.0f,-4.0f,4.0f);
     ubo.proj[1][1] *= -1;
 
@@ -828,6 +846,25 @@ void createRoundedRect(float w, float h,float depth,float rad, glm::vec3 color, 
         }
     }
 }
+void setupScene()
+{
+    srand(time(NULL));
+    for (size_t i = 0; i < 20; i++)
+    {
+        auto w = 1+rand() % 3;
+        auto h = 0.5f+ rand() % 2;
+        float x = rand() % 64;
+        float y = rand() % 64 ;
+        x = -4 + (x / 8.0f);
+        y = -4 + (y / 8.0f);
+        auto shape = std::make_shared<VKMesh2D>();
+        createRoundedRect(w,h, 0.f, 0.1f, Color::colrArr[i%Color::totalColors], shape->vertices, shape->indices);
+        shape->createBuffers(VKBackend::device);
+        shape->tMatrix = glm::translate(glm::mat4(1), glm::vec3(x, y, 0));
+        shapes.push_back(shape);
+    }
+}
+
 #pragma endregion functions
 
 int main()

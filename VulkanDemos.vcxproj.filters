@@ -70,5 +70,11 @@
     <None Include="shaders\diffuseTex.vert.glsl">
       <Filter>shaders</Filter>
     </None>
+    <None Include="shaders\solidShapes.frag.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\solidShapes.vert.glsl">
+      <Filter>shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>
