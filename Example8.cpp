@@ -64,6 +64,7 @@ struct VKMesh
     std::vector<uint16_t> indices;
     glm::mat4 rMatrix=glm::mat4(1);
     glm::mat4 tMatrix=glm::mat4(1);
+    float th = 0;
     VkBuffer vertexBuffer;
     VkDeviceMemory vertexBufferMemory;
     VkBuffer indexBuffer;
@@ -137,12 +138,30 @@ VkImageView depthImageView;
 
 std::shared_ptr<VKBackend::VKRenderTarget> msColorAttch;
 std::vector<std::shared_ptr<VKMesh2D>> shapes;
-std::shared_ptr<VKMesh2D> hand;
+std::shared_ptr<VKMesh2D> secHand,minHand,hrHand;
+std::chrono::system_clock::time_point lastTime{};
+
+struct FiveColors
+{
+    /*
+    * e63946
+    * f1faee
+    * a8dadc
+    * 457b9d
+    * 1d3557
+    */
+    glm::vec3 col1;
+    glm::vec3 col2;
+    glm::vec3 col3;
+    glm::vec3 col4;
+    glm::vec3 col5;
+};
 #pragma endregion vars
 
 #pragma region prototypes
 void createWindow();
 void initVulkan();
+void updateFrame();
 void destroyVulkan();
 
 VkSurfaceKHR createSurface(GLFWwindow* window, VkInstance instace);
@@ -155,7 +174,7 @@ void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
 void updateUniformBuffer(uint32_t currentImage);
 void createDepthResources();
 void createColorResource();
-void createCircle(float radius,float depth,glm::vec3 color,std::vector<VDPosColor> &verts,std::vector<uint16_t> &indices);
+void createCircle(float radius,float depth,float nSeg,glm::vec3 color,glm::mat4 tMat,std::vector<VDPosColor> &verts,std::vector<uint16_t> &indices);
 void createPolyline(std::vector<VDPosColor>& verts, std::vector<uint16_t>& indices);
 void createRoundedRect(float w,float h,float depth,float rad,glm::vec3 color,std::vector<VDPosColor>& verts, std::vector<uint16_t>& indices);
 void setupScene();
@@ -253,6 +272,37 @@ void initVulkan()
 
     setupScene();
     
+}
+void updateFrame()
+{
+    auto now = std::chrono::system_clock::now();
+    if (std::chrono::duration_cast<std::chrono::milliseconds>(lastTime.time_since_epoch()).count()==0)
+    {
+        lastTime = now;
+    }
+    
+    auto millisec = std::chrono::duration_cast<std::chrono::milliseconds>(lastTime-now);
+    auto thSec = millisec.count() * 0.06f;
+    secHand->th += thSec;
+    if (abs(secHand->th) >= 360)
+    {
+        secHand->th += 360;
+    }
+    lastTime = now;
+    secHand->rMatrix = glm::rotate(secHand->rMatrix, glm::radians(thSec), glm::vec3(0, 0, 1));
+
+    auto thMin = (thSec)*(1.0f/60.f);
+    minHand->th += thMin;
+    minHand->rMatrix = glm::rotate(minHand->rMatrix, glm::radians(thMin), glm::vec3(0, 0, 1));
+
+    if (abs(minHand->th) >= 360)
+    {
+        minHand->th += 360;
+    }
+
+    auto thHr = (thMin) * (1.0f / 12.f);
+    hrHand->th += thHr;
+    hrHand->rMatrix = glm::rotate(hrHand->rMatrix, glm::radians(thHr), glm::vec3(0, 0, 1));
 }
 void destroyVulkan()
 {
@@ -586,8 +636,6 @@ void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex)
     renderPassInfo.renderArea.extent = VKBackend::swapChainExtent;
 
     VkClearColorValue color = { 0.1f,0.2f,0.3f,1.0 };
-    //VkClearValue clearValues;
-    //clearValues.color = color;
     VkClearValue clearColor = { {{0.1f, 0.2f, 0.3f, 1.0f}} };
 
     std::array<VkClearValue, 2> clearValues{};
@@ -673,12 +721,13 @@ void createColorResource()
     msColorAttch->colorImageView = VKBackend::createImageView(msColorAttch->colorImage, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT);
 }
 
-void createCircle(float radius, float depth, glm::vec3 color, std::vector<VDPosColor>& verts, std::vector<uint16_t>& indices)
+void createCircle(float radius, float depth,float nSeg, glm::vec3 color,glm::mat4 tMat, std::vector<VDPosColor>& verts, std::vector<uint16_t>& indices)
 {
     auto appendMod = (verts.size() > 0);
     
     std::vector<p2t::Point*> pts;
-    for (float th=0;th<360;th+=12)
+    float tIncr = 360.f / nSeg;
+    for (float th=0;th<360;th+=tIncr)
     {
         float x = radius * cos(glm::radians(th));
         float y = radius * sin(glm::radians(th));
@@ -694,8 +743,11 @@ void createCircle(float radius, float depth, glm::vec3 color, std::vector<VDPosC
         for (int i = 0; i < 3; i++)
         {
             auto pt = tri->GetPoint(i);
-            VDPosColor vertex{glm::vec3(pt->x,pt->y,depth),color};
+            auto v = glm::vec3(tMat * glm::vec4(glm::vec3(pt->x, pt->y, depth), 1));
+            
+            VDPosColor vertex{v,color};
             verts.push_back(vertex);
+
             if(appendMod)
                 indices.push_back(static_cast<uint16_t>(verts.size()-1));
             else
@@ -817,7 +869,6 @@ void createRoundedRect(float w, float h,float depth,float rad, glm::vec3 color, 
                 auto v1 = p1r + (-wid) * n1;
                 verts.push_back({ v0,Color::getRandomColor() });
                 verts.push_back({ v1,Color::getRandomColor() });
-
             }
 
         for (uint16_t ind = 0; ind < (100 - 1)*cCount; ind++)
@@ -836,23 +887,64 @@ void createRoundedRect(float w, float h,float depth,float rad, glm::vec3 color, 
 }
 void setupScene()
 {
-    hand = std::make_shared<VKMesh2D>();
-    createRoundedRect(0.8, 0.1, 0, 0.05, Color::purple, hand->vertices, hand->indices);
-    hand->createBuffers(VKBackend::device);
-    hand->tMatrix = glm::translate(glm::mat4(1),glm::vec3(0.4f, 0, 0));
-    hand->rMatrix = glm::rotate(glm::mat4(1), glm::radians(45.0f), glm::vec3(0, 0, 1));
-    shapes.push_back(hand);
+    std::string colr[] = {
+        "e63946",
+        "f1faee",
+        "a8dadc",
+        "457b9d",
+        "1d3557"
+    };
+
+    FiveColors fColors;
+    Color::hexToRGB(colr[0], fColors.col1);
+    Color::hexToRGB(colr[1], fColors.col2);
+    Color::hexToRGB(colr[2], fColors.col3);
+    Color::hexToRGB(colr[3], fColors.col4);
+    Color::hexToRGB(colr[4], fColors.col5);
+
+    secHand = std::make_shared<VKMesh2D>();
+    createRoundedRect(0.7f, 0.06f, 0.f, 0.03f, /*Color::purple*/fColors.col1, secHand->vertices, secHand->indices);
+    secHand->createBuffers(VKBackend::device);
+    secHand->tMatrix = glm::translate(glm::mat4(1),glm::vec3(0.35f, 0, 0));
+    secHand->rMatrix = glm::rotate(glm::mat4(1), glm::radians(90.0f), glm::vec3(0, 0, 1));
+    shapes.push_back(secHand);
+
+    minHand = std::make_shared<VKMesh2D>();
+    createRoundedRect(0.5f, 0.08f, 0.f, 0.04f, /*Color::lightPink*/fColors.col4, minHand->vertices, minHand->indices);
+    minHand->createBuffers(VKBackend::device);
+    minHand->tMatrix = glm::translate(glm::mat4(1), glm::vec3(0.5f/2.f, 0, 0));
+    minHand->rMatrix = glm::rotate(glm::mat4(1), glm::radians(90.0f), glm::vec3(0, 0, 1));
+    shapes.push_back(minHand);
+
+    hrHand = std::make_shared<VKMesh2D>();
+    createRoundedRect(0.3f, 0.1f, 0.f, 0.05f, /*Color::skyBlue*/fColors.col5, hrHand->vertices, hrHand->indices);
+    hrHand->createBuffers(VKBackend::device);
+    hrHand->tMatrix = glm::translate(glm::mat4(1), glm::vec3(0.3f / 2.f, 0, 0));
+    hrHand->rMatrix = glm::rotate(glm::mat4(1), glm::radians(90.0f), glm::vec3(0, 0, 1));
+    shapes.push_back(hrHand);
 
     auto outerCircle = std::make_shared<VKMesh2D>();
-    createCircle(0.1, 0, Color::lightLavender, outerCircle->vertices, outerCircle->indices);
-    createCircle(0.9, 0, Color::white, outerCircle->vertices, outerCircle->indices);
-    createCircle(1,0,Color::purple, outerCircle->vertices, outerCircle->indices);
+    for (float th=90;th<=360;th+=90)
+    {
+        auto tMat = glm::translate(glm::mat4(1), glm::vec3(0.8f * cos(glm::radians(th)), 0.8f * sin(glm::radians(th)), 0));
+        createCircle(0.075f, 0.f,30,/* Color::pink*/fColors.col3, tMat, outerCircle->vertices, outerCircle->indices);
+    }
+
+    for (float th = 30; th < 360; th += 30)
+    {
+        if (static_cast<int>(th) % 90 == 0)
+            continue;
+
+        auto tMat = glm::translate(glm::mat4(1), glm::vec3(0.8f * cos(glm::radians(th)), 0.8f * sin(glm::radians(th)), 0));
+        createCircle(0.050f, 0.f, 30, /* Color::pink*/fColors.col3, tMat, outerCircle->vertices, outerCircle->indices);
+    }
+
+    createCircle(0.1f, 0.f, 30, /*Color::lightLavender*/fColors.col3, glm::mat4(1),outerCircle->vertices, outerCircle->indices);
+    createCircle(0.9f, 0.f, 60, /*Color::white*/fColors.col2, glm::mat4(1), outerCircle->vertices, outerCircle->indices);
+    createCircle(1.f,0.f, 60, /*Color::purple*/fColors.col5, glm::mat4(1), outerCircle->vertices, outerCircle->indices);
     outerCircle->createBuffers(VKBackend::device);
     outerCircle->tMatrix = glm::mat4(1);
     shapes.push_back(outerCircle);
-
-    
-    
 }
 
 #pragma endregion functions
@@ -862,20 +954,18 @@ int main()
     createWindow();
     initVulkan();
 
-    static float th = 0;
     uint32_t currentFrame = 0;
     while (!glfwWindowShouldClose(window))
     {
         glfwPollEvents();
 
+        updateFrame();
         vkWaitForFences(VKBackend::device, 1, &VKBackend::inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
         vkResetFences(VKBackend::device, 1, &VKBackend::inFlightFences[currentFrame]);
 
         uint32_t imageIndex;
         vkAcquireNextImageKHR(VKBackend::device, VKBackend::swapchain, UINT64_MAX, VKBackend::imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
         vkResetCommandBuffer(VKBackend::commandBuffers[currentFrame], 0);
-        th += 0.5;
-        hand->rMatrix = glm::rotate(glm::mat4(1), glm::radians(th), glm::vec3(0, 0, 1));
         recordCommandBuffer(VKBackend::commandBuffers[currentFrame], imageIndex);
 
         updateUniformBuffer(imageIndex);

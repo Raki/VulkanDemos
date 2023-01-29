@@ -34,4 +34,26 @@ namespace Color
 
 		return colrArr[i];
 	}
+	bool hexToRGB(std::string hexStr, glm::vec3& rgb)
+	{
+		if(hexStr.length()<6)
+		return false;
+
+		rgb = glm::vec3(0);
+		std::stringstream ss;
+		for (size_t i=0;i<6;i+=2)
+		{
+			int r;
+			ss << std::hex << hexStr.substr(i, 2);
+			ss >> r;
+			if (ss.fail())
+				return false;
+			rgb[i/2]=r / 255.f;
+			ss.clear();
+		}
+
+		
+
+		return true;
+	}
 };

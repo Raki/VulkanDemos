@@ -1,5 +1,9 @@
 #pragma once
 #include <glm/glm.hpp>
+#include <string>
+#include <sstream>
+#include <iomanip>
+
 namespace Color
 {
 	extern glm::vec3 red;
@@ -24,6 +28,7 @@ namespace Color
 	extern int totalColors;
 	
 	glm::vec3 getRandomColor();
+	bool hexToRGB(std::string hexStr,glm::vec3 &rgb);
 	
 };
 
