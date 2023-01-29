@@ -31,3 +31,9 @@ Bezier multi-color curve with msaa
 Push constants
 
 ![image](https://user-images.githubusercontent.com/824691/215241139-d2236ec4-ded0-44c3-b2d8-2cf3dc622d06.png)
+
+* Example 8
+
+Simple clock. This demo uses push constants for per object transformations
+
+![image](https://user-images.githubusercontent.com/824691/215296726-9c5ada93-7732-4973-91f4-237cb72ff017.png)
