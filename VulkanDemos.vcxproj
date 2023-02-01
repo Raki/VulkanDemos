@@ -19,7 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Example8.cpp" />
+    <ClCompile Include="Example9.cpp" />
     <ClCompile Include="utils\Colors.cpp" />
     <ClCompile Include="utils\Utility.cpp" />
     <ClCompile Include="utils\VKBackend.cpp" />
@@ -39,10 +39,12 @@
     <None Include="shaders\diffuse.vert.glsl" />
     <None Include="shaders\diffuseTex.frag.glsl" />
     <None Include="shaders\diffuseTex.vert.glsl" />
+    <None Include="shaders\fLights.glsl" />
     <None Include="shaders\solidShapes.frag.glsl" />
     <None Include="shaders\solidShapes.vert.glsl" />
     <None Include="shaders\triangle-mvp.vert.glsl" />
     <None Include="shaders\triangle.frag.glsl" />
+    <None Include="shaders\vLights.glsl" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
