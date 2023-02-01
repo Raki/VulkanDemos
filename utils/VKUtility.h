@@ -17,6 +17,15 @@ namespace VKUtility
         static VkVertexInputBindingDescription getBindingDescription();
     };
 
+    struct VDPosNorm
+    {
+        VDPosNorm(glm::vec3 pos, glm::vec3 norm);
+        glm::vec3 position;
+        glm::vec3 normal;
+        static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions();
+        static VkVertexInputBindingDescription getBindingDescription();
+    };
+
 	struct Mesh
 	{
         std::vector<Vertex> vData;

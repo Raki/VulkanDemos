@@ -86,6 +86,7 @@ namespace VKBackend
 	VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
 	void createSwapchainImageViews();
 	VkRenderPass createRenerPass(VkDevice device);
+	VkRenderPass createRenderPass1Sample(VkDevice device);
 	VkShaderModule loadShader(VkDevice device, std::string path);
 	void createDescriptorSetLayout(std::vector <VkDescriptorSetLayoutBinding> layoutBindings);
 	void createDescriptorPool(VkDevice device, std::vector<VkDescriptorPoolSize> poolsizes);

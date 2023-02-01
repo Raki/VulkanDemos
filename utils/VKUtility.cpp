@@ -300,4 +300,37 @@ namespace VKUtility
 		this->vData = vData;
 		this->iData = iData;
 	}
+	VDPosNorm::VDPosNorm(glm::vec3 pos, glm::vec3 norm)
+	{
+		position = pos;
+		normal = norm;
+	}
+	std::array<VkVertexInputAttributeDescription, 2> VDPosNorm::getAttributeDescriptions()
+	{
+		VkVertexInputAttributeDescription pos, norm;
+
+		pos.binding = 0;
+		pos.location = 0;
+		pos.format = VK_FORMAT_R32G32B32_SFLOAT;
+		pos.offset = 0;
+
+		norm.binding = 0;
+		norm.location = 1;
+		norm.format = VK_FORMAT_R32G32B32_SFLOAT;
+		norm.offset = sizeof(glm::vec3);
+
+
+		std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions = { pos,norm };
+
+		return attributeDescriptions;
+	}
+	VkVertexInputBindingDescription VDPosNorm::getBindingDescription()
+	{
+		VkVertexInputBindingDescription description;
+		description.binding = 0;
+		description.stride = sizeof(VDPosNorm);
+		description.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+		return description;
+	}
 }

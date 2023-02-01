@@ -211,7 +211,7 @@ void initVulkan()
 
     VKBackend::renderPass = VKBackend::createRenerPass(VKBackend::device);
 
-    auto triangleVS = VKBackend::loadShader(VKBackend::device, "shaders/solidShapes.vert.spv");
+    auto triangleVS = VKBackend::loadShader(VKBackend::device, "shaders/solidShapesBasic.vert.spv");
     assert(triangleVS);
     auto triangleFS = VKBackend::loadShader(VKBackend::device, "shaders/solidShapes.frag.spv");
     assert(triangleFS);
