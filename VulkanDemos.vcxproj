@@ -19,7 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Example9.cpp" />
+    <ClCompile Include="Example0.cpp" />
     <ClCompile Include="utils\Colors.cpp" />
     <ClCompile Include="utils\Utility.cpp" />
     <ClCompile Include="utils\VKBackend.cpp" />

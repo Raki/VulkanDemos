@@ -1125,7 +1125,7 @@ void fillCube(float width, float height, float depth,glm::mat4 tMat, std::vector
     for (auto i = 0; i < totalVerts; i++)
     {
         auto v = glm::vec3(tMat*glm::vec4(vArr.at(i),1));
-        auto n = nArr.at(i);
+        auto n = glm::normalize(nArr.at(i));
         auto uv = uvArr.at(i);
         verts.push_back({ v,n });
         indices.push_back((uint16_t)indices.size());
@@ -1139,8 +1139,8 @@ void setupScene()
     std::vector<VKUtility::VDPosNorm> verts;
     std::vector<uint16_t> inds;
 
-    const int rows = 50;
-    const int cols = 50;
+    const int rows = 40;
+    const int cols = 40;
     glm::vec3 origin = glm::vec3(-rows / 2, 0, -cols / 2);
     for (int row = 0; row < rows; row++)
     {

@@ -21,7 +21,7 @@ layout(location =1)out vec3 fraPos_out;
 
 void main()
 {
-	normal_out = mat3(ubo.nrmlMat)*normal;
+	normal_out = normalize(mat3(ubo.nrmlMat)*normal);
 	fraPos_out = vec3(ubo.model*vec4(position,1.0));
 	gl_Position= ubo.proj*ubo.view*ubo.model*vec4(position,1.0);
 }

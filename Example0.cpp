@@ -193,9 +193,16 @@ void initVulkan()
 
     renderPass = createRenerPass(device);
 
+    //glsl
     auto triangleVS = loadShader(device, "shaders/triangle-mvp.vert.spv");
+    //hlsl
+    //auto triangleVS = loadShader(device, "shaders/triangle-mvp.vert.hlsl.spv");
     assert(triangleVS);
-    auto triangleFS = loadShader(device, "shaders/triangle.frag.spv");
+    //glsl
+    //auto triangleFS = loadShader(device, "shaders/triangle.frag.spv");
+    //hlsl
+    auto triangleFS = loadShader(device, "shaders/triangle.frag.hlsl.spv");
+
     assert(triangleFS);
 
     createDescriptorSetLayout();
