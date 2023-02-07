@@ -6,6 +6,9 @@
 #include "VKUtility.h"
 #include "VKBackend.h"
 #include "Colors.h"
+#include <imgui.h>
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_vulkan.h"
 
 #pragma region vars
 const int MAX_FRAMES_IN_FLIGHT = 2;
@@ -1151,7 +1154,7 @@ void setupScene()
             float h = 0.8f + (noise * 2);
             auto trans = glm::vec3(origin.x + (row), origin.y + (h / 2), origin.z + (col));
             auto tMat = glm::translate(glm::mat4(1), trans);
-            fillCube(0.8f, h, 0.8, tMat, verts, inds);
+            fillCube(0.8f, h, 0.8f, tMat, verts, inds);
         }
     }
     cube->vertices = verts;

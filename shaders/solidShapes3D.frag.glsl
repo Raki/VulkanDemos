@@ -4,7 +4,7 @@ layout(location = 0) out vec4 outColor;
 layout(location =0)in vec3 normal_out;
 layout(location =1)in vec3 fraPos_out;
 
-vec3 lightPos = vec3(0,4,0);
+vec3 lightPos = vec3(0,20,0);
 vec3 color = vec3(0.5,0.5,1.0);
 
 float getDiffuseFactr()

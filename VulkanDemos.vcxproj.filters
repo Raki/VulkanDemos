@@ -10,6 +10,9 @@
     <Filter Include="shaders">
       <UniqueIdentifier>{940e2ac2-69f0-47be-9cb4-75e770597855}</UniqueIdentifier>
     </Filter>
+    <Filter Include="imgui">
+      <UniqueIdentifier>{ab944b45-17c6-4e2e-b014-cf9b41d78471}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="utils\Utility.cpp">
@@ -24,7 +27,13 @@
     <ClCompile Include="utils\Colors.cpp">
       <Filter>utils</Filter>
     </ClCompile>
-    <ClCompile Include="Example0.cpp">
+    <ClCompile Include="imgui\imgui_impl_glfw.cpp">
+      <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="imgui\imgui_impl_vulkan.cpp">
+      <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="Example9.cpp">
       <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>
@@ -49,6 +58,12 @@
     </ClInclude>
     <ClInclude Include="utils\Colors.h">
       <Filter>utils</Filter>
+    </ClInclude>
+    <ClInclude Include="imgui\imgui_impl_glfw.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="imgui\imgui_impl_vulkan.h">
+      <Filter>imgui</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
