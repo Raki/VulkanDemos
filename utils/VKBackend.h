@@ -78,7 +78,7 @@ namespace VKBackend
 
 	VkInstance createVulkanInstance();
 	VkPhysicalDevice pickPhysicalDevice(VkInstance instance);
-	QueueFamilyIndices pickDeviceQueueFamily(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface);
+	QueueFamilyIndices pickDeviceQueueFamily(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface,VkQueueFlagBits qFamily=VK_QUEUE_GRAPHICS_BIT);
 	VkDevice createDevice(VkPhysicalDevice physicalDevice);
 	SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
 	VkSwapchainKHR createSwapchain(VkDevice device, VkSurfaceKHR surface);

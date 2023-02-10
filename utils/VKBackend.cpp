@@ -114,7 +114,7 @@ namespace VKBackend
 		return 0;
 	}
 
-	QueueFamilyIndices pickDeviceQueueFamily(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface)
+	QueueFamilyIndices pickDeviceQueueFamily(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, VkQueueFlagBits qFamily)
 	{
 		QueueFamilyIndices indices;
 		uint32_t qFamilyPropCount = 0;
@@ -126,7 +126,7 @@ namespace VKBackend
 		for (uint32_t i = 0; i < qFamilyPropCount; i++)
 		{
 			VkQueueFamilyProperties props = qFamProps[i];
-			if (props.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+			if (props.queueFlags & qFamily)
 			{
 				indices.graphicsFamily = i;
 			}
