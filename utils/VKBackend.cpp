@@ -861,6 +861,15 @@ namespace VKBackend
 		return VK_SAMPLE_COUNT_1_BIT;
 	}
 
+	VkPipelineInputAssemblyStateCreateInfo getPipelineInputAssemblyState(VkPrimitiveTopology topology, VkBool32 primitiveRestartEnable)
+	{
+		VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
+		inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+		inputAssembly.topology = topology;
+		inputAssembly.primitiveRestartEnable = primitiveRestartEnable;
+		return inputAssembly;
+	}
+
 	VkPipelineShaderStageCreateInfo getPipelineShaderStage(VkShaderStageFlagBits shaderStage, VkShaderModule shaderModule)
 	{
 		VkPipelineShaderStageCreateInfo stage = {};
@@ -881,5 +890,14 @@ namespace VKBackend
 		vertexInputInfo.vertexAttributeDescriptionCount = vertexAttributeDescriptionCount;
 		vertexInputInfo.pVertexAttributeDescriptions = pVertexAttributeDescriptions;
 		return vertexInputInfo;
+	}
+
+	VkPipelineViewportStateCreateInfo getPipelineViewportState(uint32_t viewportCount, uint32_t scissorCount)
+	{
+		VkPipelineViewportStateCreateInfo viewportState{};
+		viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+		viewportState.viewportCount = viewportCount;
+		viewportState.scissorCount = scissorCount;
+		return viewportState;
 	}
 }

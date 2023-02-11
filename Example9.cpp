@@ -502,19 +502,10 @@ VkPipeline createGraphicsPipeline(VkDevice device, VkRenderPass renderPass, VkSh
     auto vertBindingDesc = VKUtility::VDPosNorm::getBindingDescription();
     auto vertAttribDescs = VKUtility::VDPosNorm::getAttributeDescriptions();
 
-    VkPipelineVertexInputStateCreateInfo vertexInputInfo = VKBackend::getPipelineVertexInputState(1, &vertBindingDesc,static_cast<uint32_t>(vertAttribDescs.size()),
+    auto vertexInputInfo = VKBackend::getPipelineVertexInputState(1, &vertBindingDesc,static_cast<uint32_t>(vertAttribDescs.size()),
         vertAttribDescs.data());
-
-
-    VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
-    inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-    inputAssembly.primitiveRestartEnable = VK_FALSE;
-
-    VkPipelineViewportStateCreateInfo viewportState{};
-    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-    viewportState.viewportCount = 1;
-    viewportState.scissorCount = 1;
+    auto inputAssembly = VKBackend::getPipelineInputAssemblyState(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_FALSE);
+    auto viewportState = VKBackend::getPipelineViewportState(1, 1);
 
     VkPipelineRasterizationStateCreateInfo rasterizer{};
     rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;

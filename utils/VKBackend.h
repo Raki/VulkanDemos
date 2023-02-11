@@ -110,6 +110,8 @@ namespace VKBackend
 	VkPipelineShaderStageCreateInfo getPipelineShaderStage(VkShaderStageFlagBits shaderStage,VkShaderModule shaderModule);
 	VkPipelineVertexInputStateCreateInfo getPipelineVertexInputState(uint32_t vertexBindingDescriptionCount, VkVertexInputBindingDescription* pVertexBindingDescriptions,
 	uint32_t vertexAttributeDescriptionCount, VkVertexInputAttributeDescription* pVertexAttributeDescriptions);
+	VkPipelineInputAssemblyStateCreateInfo getPipelineInputAssemblyState(VkPrimitiveTopology topology,VkBool32 primitiveRestartEnable);
+	VkPipelineViewportStateCreateInfo getPipelineViewportState(uint32_t viewportCount,uint32_t scissorCount);
 }
 
 
