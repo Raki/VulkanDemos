@@ -860,4 +860,26 @@ namespace VKBackend
 
 		return VK_SAMPLE_COUNT_1_BIT;
 	}
+
+	VkPipelineShaderStageCreateInfo getPipelineShaderStage(VkShaderStageFlagBits shaderStage, VkShaderModule shaderModule)
+	{
+		VkPipelineShaderStageCreateInfo stage = {};
+		stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		stage.stage = shaderStage;
+		stage.module = shaderModule;
+		stage.pName = "main";
+		return stage;
+	}
+
+	VkPipelineVertexInputStateCreateInfo getPipelineVertexInputState(uint32_t vertexBindingDescriptionCount, VkVertexInputBindingDescription* pVertexBindingDescriptions,
+		uint32_t vertexAttributeDescriptionCount, VkVertexInputAttributeDescription* pVertexAttributeDescriptions)
+	{
+		VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
+		vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+		vertexInputInfo.vertexBindingDescriptionCount = vertexBindingDescriptionCount;
+		vertexInputInfo.pVertexBindingDescriptions = pVertexBindingDescriptions;
+		vertexInputInfo.vertexAttributeDescriptionCount = vertexAttributeDescriptionCount;
+		vertexInputInfo.pVertexAttributeDescriptions = pVertexAttributeDescriptions;
+		return vertexInputInfo;
+	}
 }
