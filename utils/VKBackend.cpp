@@ -900,4 +900,41 @@ namespace VKBackend
 		viewportState.scissorCount = scissorCount;
 		return viewportState;
 	}
+
+	VkPipelineRasterizationStateCreateInfo getPipelineRasterState(VkPolygonMode polygonMode, float lineWidth)
+	{
+		VkPipelineRasterizationStateCreateInfo rasterizer{};
+		rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+		rasterizer.depthClampEnable = VK_FALSE;
+		rasterizer.rasterizerDiscardEnable = VK_FALSE;
+		rasterizer.polygonMode = polygonMode;
+		rasterizer.lineWidth = lineWidth;
+		return rasterizer;
+	}
+
+	VkPipelineMultisampleStateCreateInfo getPipelineMultisampleState(VkBool32 sampleShadingEnable, VkSampleCountFlagBits rasterizationSamples)
+	{
+		VkPipelineMultisampleStateCreateInfo multisampling{};
+		multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+		multisampling.sampleShadingEnable = sampleShadingEnable;
+		multisampling.rasterizationSamples = rasterizationSamples;
+		return multisampling;
+	}
+
+	VkPipelineDepthStencilStateCreateInfo getPipelineDepthStencilState(VkBool32 depthTestEnable, VkBool32 depthWriteEnable, VkCompareOp depthCompareOp, VkBool32 depthBoundsTestEnable, float minDepthBounds, float maxDepthBounds,
+		VkBool32 stencilTestEnable)
+	{
+		VkPipelineDepthStencilStateCreateInfo depthStencil{};
+		depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+		depthStencil.depthTestEnable = depthTestEnable;
+		depthStencil.depthWriteEnable = depthWriteEnable;
+		depthStencil.depthCompareOp = depthCompareOp;
+		depthStencil.depthBoundsTestEnable = depthBoundsTestEnable;
+		depthStencil.minDepthBounds = minDepthBounds; // Optional
+		depthStencil.maxDepthBounds = maxDepthBounds; // Optional
+		depthStencil.stencilTestEnable = stencilTestEnable;
+		depthStencil.front = {}; // Optional
+		depthStencil.back = {}; // Optional
+		return depthStencil;
+	}
 }

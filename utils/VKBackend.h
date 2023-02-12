@@ -112,6 +112,10 @@ namespace VKBackend
 	uint32_t vertexAttributeDescriptionCount, VkVertexInputAttributeDescription* pVertexAttributeDescriptions);
 	VkPipelineInputAssemblyStateCreateInfo getPipelineInputAssemblyState(VkPrimitiveTopology topology,VkBool32 primitiveRestartEnable);
 	VkPipelineViewportStateCreateInfo getPipelineViewportState(uint32_t viewportCount,uint32_t scissorCount);
+	VkPipelineRasterizationStateCreateInfo getPipelineRasterState(VkPolygonMode polygonMode,float lineWidth);
+	VkPipelineMultisampleStateCreateInfo getPipelineMultisampleState(VkBool32 sampleShadingEnable, VkSampleCountFlagBits rasterizationSamples);
+	VkPipelineDepthStencilStateCreateInfo getPipelineDepthStencilState(VkBool32 depthTestEnable, VkBool32 depthWriteEnable,VkCompareOp depthCompareOp,VkBool32 depthBoundsTestEnable, float minDepthBounds,float maxDepthBounds,
+		VkBool32 stencilTestEnable);
 }
 
 
