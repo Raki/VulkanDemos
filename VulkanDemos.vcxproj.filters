@@ -97,5 +97,11 @@
     <None Include="shaders\vLights.glsl">
       <Filter>shaders</Filter>
     </None>
+    <None Include="shaders\solidShapes3D.frag.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\solidShapes3D.vert.glsl">
+      <Filter>shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

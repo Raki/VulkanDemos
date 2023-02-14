@@ -46,6 +46,8 @@
     <None Include="shaders\fLights.glsl" />
     <None Include="shaders\solidShapes.frag.glsl" />
     <None Include="shaders\solidShapes.vert.glsl" />
+    <None Include="shaders\solidShapes3D.frag.glsl" />
+    <None Include="shaders\solidShapes3D.vert.glsl" />
     <None Include="shaders\triangle-mvp.vert.glsl" />
     <None Include="shaders\triangle.frag.glsl" />
     <None Include="shaders\vLights.glsl" />
