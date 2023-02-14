@@ -937,4 +937,28 @@ namespace VKBackend
 		depthStencil.back = {}; // Optional
 		return depthStencil;
 	}
+
+	VkPipelineColorBlendAttachmentState getColorBlendAttachState(VkColorComponentFlags colorWriteMask, VkBool32 blendEnable)
+	{
+		VkPipelineColorBlendAttachmentState colorBlendAttachment{};
+		colorBlendAttachment.colorWriteMask = colorWriteMask;
+		colorBlendAttachment.blendEnable = blendEnable;
+		return colorBlendAttachment;
+	}
+
+	VkPipelineColorBlendStateCreateInfo getColorBlendState(VkBool32 logicOpEnable, VkLogicOp logicOp, uint32_t attachmentCount,
+		VkPipelineColorBlendAttachmentState* pAttachments, const float blendConsts[4])
+	{
+		VkPipelineColorBlendStateCreateInfo colorBlending{};
+		colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+		colorBlending.logicOpEnable = logicOpEnable;
+		colorBlending.logicOp = logicOp;
+		colorBlending.attachmentCount = attachmentCount;
+		colorBlending.pAttachments = pAttachments;
+		colorBlending.blendConstants[0] = blendConsts[0];
+		colorBlending.blendConstants[1] = blendConsts[1];
+		colorBlending.blendConstants[2] = blendConsts[2];
+		colorBlending.blendConstants[3] = blendConsts[3];
+		return colorBlending;
+	}
 }
