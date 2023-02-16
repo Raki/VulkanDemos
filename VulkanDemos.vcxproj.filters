@@ -33,7 +33,7 @@
     <ClCompile Include="imgui\imgui_impl_vulkan.cpp">
       <Filter>imgui</Filter>
     </ClCompile>
-    <ClCompile Include="Example9.cpp">
+    <ClCompile Include="Compute.cpp">
       <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>
