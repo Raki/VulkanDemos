@@ -37,3 +37,8 @@ Push constants
 Simple clock. This demo uses push constants for per object transformations
 
 ![image](https://user-images.githubusercontent.com/824691/215296726-9c5ada93-7732-4973-91f4-237cb72ff017.png)
+
+* Example 9
+
+![image](https://user-images.githubusercontent.com/824691/219277385-f94364c4-f1bc-4fc2-9b8c-b823772ea1d0.png)
+
