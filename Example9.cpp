@@ -687,7 +687,7 @@ void updateUniformBuffer(uint32_t currentImage)
     //ubo.model = glm::mat4(1.0f);
     ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(time*5), glm::vec3(0.0f, 1.0f, 0.0f));
     ubo.view = glm::lookAt(glm::vec3(0.0f, 15.f, 50.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-    ubo.proj = glm::perspective(glm::radians(45.0f), VKBackend::swapChainExtent.width / (float)VKBackend::swapChainExtent.height, 0.1f, 100.0f);
+    ubo.proj = glm::perspective(glm::radians(45.0f), VKBackend::swapChainExtent.width / (float)VKBackend::swapChainExtent.height, 0.1f, 500.0f);
 
     auto mv = ubo.model;
     ubo.nrmlMat = glm::transpose(glm::inverse(mv));
@@ -1092,8 +1092,9 @@ void setupScene()
     std::vector<VKUtility::VDPosNorm> verts;
     std::vector<uint16_t> inds;
 
-    const int rows = 40;
-    const int cols = 40;
+    const int rows = 50;
+    const int cols = 50;
+
     glm::vec3 origin = glm::vec3(-rows / 2, 0, -cols / 2);
     for (int row = 0; row < rows; row++)
     {
