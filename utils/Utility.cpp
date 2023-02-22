@@ -17,6 +17,10 @@ namespace Utility
     {
         // binary mode is only for switching off newline translation
         std::ifstream file(filename, std::ios::binary);
+
+        if (!file.good())
+            return std::vector<unsigned char>();
+
         file.unsetf(std::ios::skipws);
 
         std::streampos file_size;
