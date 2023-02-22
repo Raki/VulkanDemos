@@ -12,7 +12,7 @@
 */
 int main()
 {
-    auto data = Utility::readBinaryFileContents("shaders/blend2.vert.spv");
+    auto data = Utility::readBinaryFileContents("shaders/blend.vert.spv");
 
     if (data.size() == 0)
         return EXIT_FAILURE;
