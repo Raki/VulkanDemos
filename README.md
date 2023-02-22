@@ -42,3 +42,7 @@ Simple clock. This demo uses push constants for per object transformations
 
 ![image](https://user-images.githubusercontent.com/824691/219277385-f94364c4-f1bc-4fc2-9b8c-b823772ea1d0.png)
 
+* Example 10
+
+ Goal of this program is to explore SPIRV-Reflect
+ https://github.com/KhronosGroup/SPIRV-Reflect
