@@ -513,34 +513,25 @@ VkPipeline createGraphicsPipeline(VkDevice device, VkRenderPass renderPass, VkSh
     auto multisampling = VKBackend::getPipelineMultisampleState(VK_FALSE, VKBackend::msaaSamples);
     auto depthStencil = VKBackend::getPipelineDepthStencilState(VK_TRUE,VK_TRUE,VK_COMPARE_OP_LESS,VK_FALSE,0.0f,1.0f,VK_FALSE);
 
-    VkPipelineColorBlendAttachmentState colorBlendAttachment = VKBackend::getColorBlendAttachState(VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT, VK_FALSE);
+    VkPipelineColorBlendAttachmentState colorBlendAttachment = VKBackend::getPipelineColorBlendAttachState(VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT, VK_FALSE);
     const float blendConsts[4] = {0,0,0,0};
-    auto colorBlending = VKBackend::getColorBlendState(VK_FALSE, VK_LOGIC_OP_COPY, 1, &colorBlendAttachment, blendConsts);
+    auto colorBlending = VKBackend::getPipelineColorBlendState(VK_FALSE, VK_LOGIC_OP_COPY, 1, &colorBlendAttachment, blendConsts);
 
     std::vector<VkDynamicState> dynamicStates = {
         VK_DYNAMIC_STATE_VIEWPORT,
         VK_DYNAMIC_STATE_SCISSOR
     };
-    VkPipelineDynamicStateCreateInfo dynamicState{};
-    dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-    dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
-    dynamicState.pDynamicStates = dynamicStates.data();
+    auto dynamicState = VKBackend::getPipelineDynamicState(dynamicStates);
 
     VkPushConstantRange pushConstant;
     pushConstant.offset = 0;
     pushConstant.size = sizeof(PushConstant);
     pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
-    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = &VKBackend::descriptorSetLayout;
-    pipelineLayoutInfo.pPushConstantRanges = &pushConstant;
-    pipelineLayoutInfo.pushConstantRangeCount = 1;
+    std::vector<VkPushConstantRange> pushConstants = {pushConstant};
+    std::vector<VkDescriptorSetLayout> descriptorLayouts = { VKBackend::descriptorSetLayout };
 
-    if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &VKBackend::pipelineLayout) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create pipeline layout!");
-    }
+    VKBackend::pipelineLayout = VKBackend::createPipelineLayout(descriptorLayouts, pushConstants);
 
     VkPipeline graphicsPipeline;
     VkGraphicsPipelineCreateInfo pipelineInfo{};
