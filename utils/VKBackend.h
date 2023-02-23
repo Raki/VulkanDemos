@@ -107,6 +107,8 @@ namespace VKBackend
 	void createTextureSampler(VkSampler& textureSampler);
 	VkSampleCountFlagBits getMaxUsableSampleCount();
 
+
+	VkPipelineLayout createPipelineLayout(std::vector<VkDescriptorSetLayout> &setLayouts,std::vector<VkPushConstantRange> &pushConstants);
 	VkPipelineShaderStageCreateInfo getPipelineShaderStage(VkShaderStageFlagBits shaderStage,VkShaderModule shaderModule);
 	VkPipelineVertexInputStateCreateInfo getPipelineVertexInputState(uint32_t vertexBindingDescriptionCount, VkVertexInputBindingDescription* pVertexBindingDescriptions,
 	uint32_t vertexAttributeDescriptionCount, VkVertexInputAttributeDescription* pVertexAttributeDescriptions);
@@ -116,9 +118,10 @@ namespace VKBackend
 	VkPipelineMultisampleStateCreateInfo getPipelineMultisampleState(VkBool32 sampleShadingEnable, VkSampleCountFlagBits rasterizationSamples);
 	VkPipelineDepthStencilStateCreateInfo getPipelineDepthStencilState(VkBool32 depthTestEnable, VkBool32 depthWriteEnable,VkCompareOp depthCompareOp,VkBool32 depthBoundsTestEnable, float minDepthBounds,float maxDepthBounds,
 		VkBool32 stencilTestEnable);
-	VkPipelineColorBlendAttachmentState getColorBlendAttachState(VkColorComponentFlags colorWriteMask, VkBool32 blendEnable);
-	VkPipelineColorBlendStateCreateInfo getColorBlendState(VkBool32 logicOpEnable, VkLogicOp logicOp,uint32_t attachmentCount,
+	VkPipelineColorBlendAttachmentState getPipelineColorBlendAttachState(VkColorComponentFlags colorWriteMask, VkBool32 blendEnable);
+	VkPipelineColorBlendStateCreateInfo getPipelineColorBlendState(VkBool32 logicOpEnable, VkLogicOp logicOp,uint32_t attachmentCount,
 		VkPipelineColorBlendAttachmentState* pAttachments,const float blendConsts[4]);
+	VkPipelineDynamicStateCreateInfo getPipelineDynamicState(std::vector<VkDynamicState> &dynamicStates);
 }
 
 

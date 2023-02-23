@@ -861,6 +861,23 @@ namespace VKBackend
 		return VK_SAMPLE_COUNT_1_BIT;
 	}
 
+	VkPipelineLayout createPipelineLayout(std::vector<VkDescriptorSetLayout>& setLayouts, std::vector<VkPushConstantRange>& pushConstants)
+	{
+		VkPipelineLayout pLayout;
+		VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		pipelineLayoutInfo.setLayoutCount = setLayouts.size();
+		pipelineLayoutInfo.pSetLayouts = setLayouts.data();// &VKBackend::descriptorSetLayout;
+		pipelineLayoutInfo.pPushConstantRanges = pushConstants.data();// &pushConstant;
+		pipelineLayoutInfo.pushConstantRangeCount = pushConstants.size();
+
+		if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pLayout) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create pipeline layout!");
+		}
+
+		return pLayout;
+	}
+
 	VkPipelineInputAssemblyStateCreateInfo getPipelineInputAssemblyState(VkPrimitiveTopology topology, VkBool32 primitiveRestartEnable)
 	{
 		VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
@@ -938,7 +955,7 @@ namespace VKBackend
 		return depthStencil;
 	}
 
-	VkPipelineColorBlendAttachmentState getColorBlendAttachState(VkColorComponentFlags colorWriteMask, VkBool32 blendEnable)
+	VkPipelineColorBlendAttachmentState getPipelineColorBlendAttachState(VkColorComponentFlags colorWriteMask, VkBool32 blendEnable)
 	{
 		VkPipelineColorBlendAttachmentState colorBlendAttachment{};
 		colorBlendAttachment.colorWriteMask = colorWriteMask;
@@ -946,7 +963,7 @@ namespace VKBackend
 		return colorBlendAttachment;
 	}
 
-	VkPipelineColorBlendStateCreateInfo getColorBlendState(VkBool32 logicOpEnable, VkLogicOp logicOp, uint32_t attachmentCount,
+	VkPipelineColorBlendStateCreateInfo getPipelineColorBlendState(VkBool32 logicOpEnable, VkLogicOp logicOp, uint32_t attachmentCount,
 		VkPipelineColorBlendAttachmentState* pAttachments, const float blendConsts[4])
 	{
 		VkPipelineColorBlendStateCreateInfo colorBlending{};
@@ -960,5 +977,14 @@ namespace VKBackend
 		colorBlending.blendConstants[2] = blendConsts[2];
 		colorBlending.blendConstants[3] = blendConsts[3];
 		return colorBlending;
+	}
+
+	VkPipelineDynamicStateCreateInfo getPipelineDynamicState(std::vector<VkDynamicState>& dynamicStates)
+	{
+		VkPipelineDynamicStateCreateInfo dynamicState{};
+		dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+		dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
+		dynamicState.pDynamicStates = dynamicStates.data();
+		return dynamicState;
 	}
 }
