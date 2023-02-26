@@ -19,9 +19,9 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Example9.cpp" />
     <ClCompile Include="imgui\imgui_impl_glfw.cpp" />
     <ClCompile Include="imgui\imgui_impl_vulkan.cpp" />
-    <ClCompile Include="SPIRV_Reflect_Test.cpp" />
     <ClCompile Include="utils\Colors.cpp" />
     <ClCompile Include="utils\spirv_reflect.cpp" />
     <ClCompile Include="utils\Utility.cpp" />

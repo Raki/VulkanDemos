@@ -64,6 +64,12 @@ struct UniformBufferObject
     glm::mat4 nrmlMat;
 };
 
+struct UBOFrag
+{
+    glm::vec4 position;
+    glm::vec4 color;
+};
+
 struct VKMesh
 {
     glm::vec3 rOrigin=glm::vec3(0);
@@ -182,8 +188,18 @@ struct PushConstant
     glm::mat4 tMat;
 };
 
+struct Buffer
+{
+    std::vector<VkBuffer> uniformBuffers;
+    std::vector<VkDeviceMemory> uniformBufferMemories;
+    bool isDirtry = true;
+};
+
+Buffer uboFrag;
+UBOFrag lightInfo;
 std::vector<VkBuffer> uniformBuffers;
 std::vector<VkDeviceMemory> uniformBufferMemories;
+
 std::vector<VKUtility::Vertex> vertices;
 std::vector<VDPosColor> verticesSolid;
 std::vector<uint16_t> indices;
@@ -247,6 +263,16 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GLFW_TRUE);
+    else if (key == GLFW_KEY_LEFT && action == GLFW_PRESS)
+    {
+        lightInfo.position.x -= 1;
+        uboFrag.isDirtry = true;
+    }
+    else if (key == GLFW_KEY_RIGHT&& action == GLFW_PRESS)
+    {
+        lightInfo.position.x += 1;
+        uboFrag.isDirtry = true;
+    }
 }
 
 void createWindow()
@@ -303,7 +329,14 @@ void initVulkan()
     uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
     uboLayoutBinding.pImmutableSamplers = nullptr;
 
-    std::vector<VkDescriptorSetLayoutBinding> layoutBindings = { uboLayoutBinding };
+    VkDescriptorSetLayoutBinding uboLayoutBindingFrag;
+    uboLayoutBindingFrag.binding = 1;
+    uboLayoutBindingFrag.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uboLayoutBindingFrag.descriptorCount = 1;
+    uboLayoutBindingFrag.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    uboLayoutBindingFrag.pImmutableSamplers = nullptr;
+
+    std::vector<VkDescriptorSetLayoutBinding> layoutBindings = { uboLayoutBinding,uboLayoutBindingFrag };
     VKBackend::createDescriptorSetLayout(layoutBindings);
     
     createUniformBuffers();
@@ -312,7 +345,11 @@ void initVulkan()
     poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSize.descriptorCount = static_cast<uint32_t>(VKBackend::swapchainMinImageCount);
 
-    std::vector<VkDescriptorPoolSize> poolsizes = { poolSize };
+    VkDescriptorPoolSize poolSizeUboFrag;
+    poolSizeUboFrag.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSizeUboFrag.descriptorCount = static_cast<uint32_t>(VKBackend::swapchainMinImageCount);
+
+    std::vector<VkDescriptorPoolSize> poolsizes = { poolSize,poolSizeUboFrag };
     VKBackend::createDescriptorPool(VKBackend::device,poolsizes);
     createDescriptorSets(VKBackend::device);
 
@@ -422,14 +459,19 @@ VkSurfaceKHR createSurface(GLFWwindow* window, VkInstance instance)
 }
 void createUniformBuffers()
 {
-    VkDeviceSize bufferSize = sizeof(UniformBufferObject);
-
+    uboFrag.uniformBuffers.resize(VKBackend::swapchainMinImageCount);
+    uboFrag.uniformBufferMemories.resize(VKBackend::swapchainMinImageCount);
+    
     uniformBuffers.resize(VKBackend::swapchainMinImageCount);
     uniformBufferMemories.resize(VKBackend::swapchainMinImageCount);
 
     for (size_t i = 0; i < VKBackend::swapchainMinImageCount; i++)
     {
+       VkDeviceSize bufferSize = sizeof(UniformBufferObject);
        VKBackend::createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers.at(i), uniformBufferMemories.at(i));
+
+       bufferSize = sizeof(UBOFrag);
+       VKBackend::createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uboFrag.uniformBuffers.at(i), uboFrag.uniformBufferMemories.at(i));
     }
 }
 void createDescriptorSets(VkDevice device)
@@ -454,6 +496,11 @@ void createDescriptorSets(VkDevice device)
         bufferInfo.offset = 0;
         bufferInfo.range = sizeof(UniformBufferObject);
 
+        VkDescriptorBufferInfo bufferInfoFrag{};
+        bufferInfoFrag.buffer = uboFrag.uniformBuffers[i];
+        bufferInfoFrag.offset = 0;
+        bufferInfoFrag.range = sizeof(UBOFrag);
+
         /*VkDescriptorImageInfo imageInfo{};
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         imageInfo.imageView = texture0->textureImageView;
@@ -464,7 +511,7 @@ void createDescriptorSets(VkDevice device)
         imageInfo2.imageView = texture->textureImageView;
         imageInfo2.sampler = texture->textureSampler;*/
 
-        std::array<VkWriteDescriptorSet, 1> descriptorWrites{};
+        std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
         descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrites[0].dstSet = VKBackend::descriptorSets[i];
         descriptorWrites[0].dstBinding = 0;
@@ -472,6 +519,14 @@ void createDescriptorSets(VkDevice device)
         descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         descriptorWrites[0].descriptorCount = 1;
         descriptorWrites[0].pBufferInfo = &bufferInfo;
+
+        descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[1].dstSet = VKBackend::descriptorSets[i];
+        descriptorWrites[1].dstBinding = 1;
+        descriptorWrites[1].dstArrayElement = 0;
+        descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorWrites[1].descriptorCount = 1;
+        descriptorWrites[1].pBufferInfo = &bufferInfoFrag;
 
        /* descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrites[1].dstSet = VKBackend::descriptorSets[i];
@@ -688,6 +743,19 @@ void updateUniformBuffer(uint32_t currentImage)
     vkMapMemory(VKBackend::device, uniformBufferMemories[currentImage], 0, sizeof(ubo), 0, &data);
     memcpy(data, &ubo, sizeof(ubo));
     vkUnmapMemory(VKBackend::device, uniformBufferMemories[currentImage]);
+
+    if (uboFrag.isDirtry)
+    {
+        uboFrag.isDirtry = false;
+        for (size_t ci=0;ci<VKBackend::swapChainImageViews.size();ci++)
+        {
+            void* uboData;
+            
+            vkMapMemory(VKBackend::device, uboFrag.uniformBufferMemories[ci], 0, sizeof(lightInfo), 0, &uboData);
+            memcpy(uboData, &lightInfo, sizeof(lightInfo));
+            vkUnmapMemory(VKBackend::device, uboFrag.uniformBufferMemories[ci]);
+        }
+    }
 }
 void createDepthResources()
 {
@@ -1106,6 +1174,9 @@ void setupScene()
 
     shapes.push_back(cube);
 
+    lightInfo.position = glm::vec4(0, 20, 0, 0);
+    lightInfo.color = glm::vec4(0.5, 0.5, 1.f, 1.0f);
+    
 }
 
 #pragma endregion functions

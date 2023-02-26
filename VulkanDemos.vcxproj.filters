@@ -33,11 +33,11 @@
     <ClCompile Include="imgui\imgui_impl_vulkan.cpp">
       <Filter>imgui</Filter>
     </ClCompile>
-    <ClCompile Include="SPIRV_Reflect_Test.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="utils\spirv_reflect.cpp">
       <Filter>utils</Filter>
+    </ClCompile>
+    <ClCompile Include="Example9.cpp">
+      <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
