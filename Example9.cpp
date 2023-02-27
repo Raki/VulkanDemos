@@ -17,45 +17,6 @@ const int WIN_HEIGHT = 1024;
 GLFWwindow* window;
 auto closeWindow = false;
 
-struct VDPosColor
-{
-    VDPosColor(glm::vec3 pos, glm::vec3 colr)
-    {
-        position = pos;
-        color = colr;
-    }
-    glm::vec3 position;
-    glm::vec3 color;
-
-    static VkVertexInputBindingDescription getBindingDescription()
-    {
-        VkVertexInputBindingDescription description;
-        description.binding = 0;
-        description.stride = sizeof(VDPosColor);
-        description.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-        return description;
-    }
-
-    static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions() {
-        VkVertexInputAttributeDescription pos, colr;
-
-        pos.binding = 0;
-        pos.location = 0;
-        pos.format = VK_FORMAT_R32G32B32_SFLOAT;
-        pos.offset = 0;
-
-        colr.binding = 0;
-        colr.location = 1;
-        colr.format = VK_FORMAT_R32G32B32_SFLOAT;
-        colr.offset = sizeof(glm::vec3);
-
-        std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions = { pos,colr };
-
-        return attributeDescriptions;
-    }
-};
-
 struct UniformBufferObject
 {
     glm::mat4 model;
@@ -81,56 +42,6 @@ struct VKMesh
     VkDeviceMemory vertexBufferMemory;
     VkBuffer indexBuffer;
     VkDeviceMemory indexBufferMemory;
-};
-
-struct VKMesh2D : VKMesh
-{
-    std::vector<VDPosColor> vertices;
-    void createBuffers(VkDevice device)
-    {
-        //size of buffers
-        VkDeviceSize vBuffSize = sizeof(VDPosColor) * vertices.size();
-        VkDeviceSize iBuffSize = sizeof(uint16_t) * indices.size();
-
-        //staging buffer
-        VkBuffer vStageBuff, iStageBuff;
-        VkDeviceMemory vStageBuffMemory, iStageBuffMemory;
-
-        VKBackend::createBuffer(vBuffSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, vStageBuff, vStageBuffMemory);
-        void* data;
-        vkMapMemory(device, vStageBuffMemory, 0, vBuffSize, 0, &data);
-        memcpy(data, vertices.data(), (size_t)vBuffSize);
-        vkUnmapMemory(device, vStageBuffMemory);
-
-        VKBackend::createBuffer(iBuffSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, iStageBuff, iStageBuffMemory);
-        void* iData;
-        vkMapMemory(device, iStageBuffMemory, 0, iBuffSize, 0, &iData);
-        memcpy(iData, indices.data(), (size_t)iBuffSize);
-        vkUnmapMemory(device, iStageBuffMemory);
-
-        //create device memory backed buffer
-        VKBackend::createBuffer(vBuffSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
-        VKBackend::createBuffer(iBuffSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
-
-        //transfer memory from staging to device memory backed buffer
-
-        VkCommandBuffer commandBuffer = VKBackend::beginSingleTimeCommands();
-
-        VkBufferCopy copyRegion{}, copyRegionIndex{};
-        copyRegion.size = vBuffSize;
-        copyRegionIndex.size = iBuffSize;
-
-        vkCmdCopyBuffer(commandBuffer, vStageBuff, vertexBuffer, 1, &copyRegion);
-        vkCmdCopyBuffer(commandBuffer, iStageBuff, indexBuffer, 1, &copyRegionIndex);
-
-        VKBackend::endSingleTimeCommands(commandBuffer);
-
-        vkDestroyBuffer(device, vStageBuff, nullptr);
-        vkFreeMemory(device, vStageBuffMemory, nullptr);
-
-        vkDestroyBuffer(device, iStageBuff, nullptr);
-        vkFreeMemory(device, iStageBuffMemory, nullptr);
-    }
 };
 
 struct VKMesh3D : VKMesh
@@ -201,7 +112,6 @@ std::vector<VkBuffer> uniformBuffers;
 std::vector<VkDeviceMemory> uniformBufferMemories;
 
 std::vector<VKUtility::Vertex> vertices;
-std::vector<VDPosColor> verticesSolid;
 std::vector<uint16_t> indices;
 
 VkImage depthImage;
@@ -246,9 +156,6 @@ void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
 void updateUniformBuffer(uint32_t currentImage);
 void createDepthResources();
 void createColorResource();
-void createCircle(float radius,float depth,float nSeg,glm::vec3 color,glm::mat4 tMat,std::vector<VDPosColor> &verts,std::vector<uint16_t> &indices);
-void createPolyline(std::vector<VDPosColor>& verts, std::vector<uint16_t>& indices);
-void createRoundedRect(float w,float h,float depth,float rad,glm::vec3 color,std::vector<VDPosColor>& verts, std::vector<uint16_t>& indices);
 void fillCube(float width, float height, float depth,glm::mat4 tMat, std::vector<VKUtility::VDPosNorm>& verts, std::vector<uint16_t>& indices);
 void setupScene();
 #pragma endregion prototypes
@@ -773,170 +680,6 @@ void createColorResource()
     msColorAttch->colorImageView = VKBackend::createImageView(msColorAttch->colorImage, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT);
 }
 
-void createCircle(float radius, float depth,float nSeg, glm::vec3 color,glm::mat4 tMat, std::vector<VDPosColor>& verts, std::vector<uint16_t>& indices)
-{
-    auto appendMod = (verts.size() > 0);
-    
-    std::vector<p2t::Point*> pts;
-    float tIncr = 360.f / nSeg;
-    for (float th=0;th<360;th+=tIncr)
-    {
-        float x = radius * cos(glm::radians(th));
-        float y = radius * sin(glm::radians(th));
-        p2t::Point* pt = new p2t::Point(x, y);
-        pts.push_back(pt);
-    }
-    p2t::CDT* cdt = new p2t::CDT(pts);
-    cdt->Triangulate();
-    auto tris = cdt->GetTriangles();
-
-    for (auto tri : tris)
-    {
-        for (int i = 0; i < 3; i++)
-        {
-            auto pt = tri->GetPoint(i);
-            auto v = glm::vec3(tMat * glm::vec4(glm::vec3(pt->x, pt->y, depth), 1));
-            
-            VDPosColor vertex{v,color};
-            verts.push_back(vertex);
-
-            if(appendMod)
-                indices.push_back(static_cast<uint16_t>(verts.size()-1));
-            else
-                indices.push_back(static_cast<uint16_t>(indices.size()));
-        }
-    }
-
-    delete cdt;
-}
-void createPolyline(std::vector<VDPosColor>& verts, std::vector<uint16_t>& indices)
-{
-    Bezier::Bezier<2> cubicBezier({ {0, -0.5}, {0, 0}, {0.5, 0}/*, {0.220, 0.040}*/ });
-
-    /*Bezier::Point b1{ 0.0157,0.1528 };
-    Bezier::Point b2{ 0.0865,0.237 };
-    Bezier::Point b3{ 0.220, 0.260 };
-    Bezier::Point b4{ 0.249, 0.105 };
-    const float scl = 4;
-
-    b1 = b1 * scl;
-    b2 = b2 * scl;
-    b3 = b3 * scl;
-    b4 = b4 * scl;*/
-    //Bezier::Bezier<3> cubicBezier({ b1, b2, b3, b4});
-    //cubicBezier.translate({ -0.5,-0.5 });
-    const float wid = 0.03f;
-    glm::vec3 colr = glm::vec3(0.1, 0.2, 0.3);
-    for (float v = 0; v < 1.0; v += 0.01f)
-    {
-        Bezier::Point p1;
-        p1 = cubicBezier.valueAt(v);
-        Bezier::Normal bn1 = cubicBezier.normalAt(v);
-        glm::vec3 p1r = glm::vec3(p1[0],p1[1],0);
-        glm::vec3 n1 = glm::normalize(glm::vec3(bn1[0], bn1[1], 0));
-        auto v0 = p1r + (wid) * n1;
-        auto v1 = p1r + (-wid) * n1;
-        verts.push_back({v0,Color::getRandomColor()});
-        verts.push_back({v1,Color::getRandomColor() });
-    }
-
-    for (uint16_t ind=0;ind<100-1;ind++)
-    {
-        uint16_t c0 = ind * 2;
-        uint16_t c1 = (ind+1) * 2;
-        indices.push_back(c0+1);
-        indices.push_back(c1+1);
-        indices.push_back(c1);
-
-        indices.push_back(c0+1);
-        indices.push_back(c1);
-        indices.push_back(c0);
-    }
-}
-void createRoundedRect(float w, float h,float depth,float rad, glm::vec3 color, std::vector<VDPosColor>& verts, std::vector<uint16_t>& indices)
-{
-    Bezier::Point p1{ -w / 2,-h / 2 }, p2{ w / 2,-h / 2 }, p3{ w / 2,h / 2 }, p4{ -w / 2,h / 2 };
-
-    Bezier::Bezier<2> c1({ {p1[0],p1[1]+rad},p1,{p1[0]+rad,p1[1]} });
-    Bezier::Bezier<2> c2({ {p2[0]- rad,p2[1]},p2,{p2[0],p2[1]+rad} });
-    Bezier::Bezier<2> c3({ {p3[0],p3[1]-rad},p3,{p3[0] - rad,p3[1]} });
-    Bezier::Bezier<2> c4({ {p4[0] + rad,p4[1]},p4,{p4[0],p4[1]-rad} });
-    std::array<Bezier::Bezier<2>, 4> curves = {c1,c2,c3,c4};
-
-    const float wid = 0.03f;
-    glm::vec3 colr = color;
-    std::vector<p2t::Point*> pts;
-
-    auto fill = true;
-
-    if (fill)
-    {
-        for (size_t c = 0; c < 4; c++)
-            for (float v = 0; v < 1.0; v += 0.01f)
-            {
-                Bezier::Point p1;
-                p1 = curves.at(c).valueAt(v);
-                p2t::Point* pt = new p2t::Point(p1[0], p1[1]);
-                if (pts.size() > 0)
-                {
-                    if (pts.at(pts.size() - 1)->x != p1[0] &&
-                        pts.at(pts.size() - 1)->y != p1[1])
-                        pts.push_back(pt);
-                }
-                else
-                    pts.push_back(pt);
-
-
-            }
-
-        p2t::CDT* cdt = new p2t::CDT(pts);
-        cdt->Triangulate();
-        auto tris = cdt->GetTriangles();
-
-        for (auto tri : tris)
-        {
-            for (int i = 0; i < 3; i++)
-            {
-                auto pt = tri->GetPoint(i);
-                VDPosColor vertex{ glm::vec3(pt->x,pt->y,depth),color };
-                verts.push_back(vertex);
-                indices.push_back(static_cast<uint16_t>(indices.size()));
-            }
-        }
-
-        delete cdt;
-    }
-    else
-    {
-        const size_t cCount = 4;
-        for (size_t c = 0; c < cCount; c++)
-            for (float v = 0; v < 1.0; v += 0.01f)
-            {
-                Bezier::Point p1;
-                p1 = curves.at(c).valueAt(v);
-                Bezier::Normal bn1 = curves.at(c).normalAt(v);
-                glm::vec3 p1r = glm::vec3(p1[0], p1[1], 0);
-                glm::vec3 n1 = glm::normalize(glm::vec3(bn1[0], bn1[1], 0));
-                auto v0 = p1r + (wid)*n1;
-                auto v1 = p1r + (-wid) * n1;
-                verts.push_back({ v0,Color::getRandomColor() });
-                verts.push_back({ v1,Color::getRandomColor() });
-            }
-
-        for (uint16_t ind = 0; ind < (100 - 1)*cCount; ind++)
-        {
-            uint16_t c0 = ind * 2;
-            uint16_t c1 = (ind + 1) * 2;
-            indices.push_back(c0 + 1);
-            indices.push_back(c1 + 1);
-            indices.push_back(c1);
-
-            indices.push_back(c0 + 1);
-            indices.push_back(c1);
-            indices.push_back(c0);
-        }
-    }
-}
 void fillCube(float width, float height, float depth,glm::mat4 tMat, std::vector<VKUtility::VDPosNorm>& verts, std::vector<uint16_t>& indices)
 {
     auto hasTex = true;
