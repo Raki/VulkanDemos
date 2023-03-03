@@ -122,6 +122,8 @@ namespace VKBackend
 	VkPipelineColorBlendStateCreateInfo getPipelineColorBlendState(VkBool32 logicOpEnable, VkLogicOp logicOp,uint32_t attachmentCount,
 		VkPipelineColorBlendAttachmentState* pAttachments,const float blendConsts[4]);
 	VkPipelineDynamicStateCreateInfo getPipelineDynamicState(std::vector<VkDynamicState> &dynamicStates);
+
+	bool supportForDescriptorIndexing(VkPhysicalDevice phyDevice);
 }
 
 

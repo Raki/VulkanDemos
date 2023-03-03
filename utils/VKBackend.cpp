@@ -987,4 +987,19 @@ namespace VKBackend
 		dynamicState.pDynamicStates = dynamicStates.data();
 		return dynamicState;
 	}
+
+	bool supportForDescriptorIndexing(VkPhysicalDevice phyDevice)
+	{
+		VkPhysicalDeviceDescriptorIndexingFeatures index_feat
+		{
+			VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES, nullptr 
+		};
+		VkPhysicalDeviceFeatures2 deviceFeat = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 ,&index_feat};
+		
+		vkGetPhysicalDeviceFeatures2(phyDevice, &deviceFeat);
+		
+		return index_feat.descriptorBindingPartiallyBound&&
+			index_feat.runtimeDescriptorArray;
+		
+	}
 }
