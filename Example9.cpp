@@ -211,6 +211,11 @@ void initVulkan()
 
     auto queFamilyIndices = VKBackend::pickDeviceQueueFamily(VKBackend::physicalDevice, VKBackend::surface);
 
+    bool bindlessResources = VKBackend::supportForDescriptorIndexing(VKBackend::physicalDevice);
+
+    if(bindlessResources)
+        fmt::print("GPU supports descriptor indexing");
+
     VKBackend::device = VKBackend::createDevice(VKBackend::physicalDevice);
 
     auto swapChainSupportDetails = VKBackend::querySwapChainSupport(VKBackend::physicalDevice);
