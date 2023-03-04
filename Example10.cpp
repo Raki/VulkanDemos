@@ -231,24 +231,24 @@ void initVulkan()
     auto triangleFS = VKBackend::loadShader(VKBackend::device, "shaders/solidShapes3D.frag.spv");
     assert(triangleFS);
 
+    auto setsV = VKBackend::getDescriptorSetLayoutDataFromSpv("shaders/solidShapes3D.vert.spv");
+    auto setsF = VKBackend::getDescriptorSetLayoutDataFromSpv("shaders/solidShapes3D.frag.spv");
+
+    std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
+
+    for (const auto& set : setsV)
+    {
+        layoutBindings.insert(layoutBindings.end(), set.bindings.begin(), set.bindings.end());
+    }
+
+    for (const auto& set : setsF)
+    {
+        layoutBindings.insert(layoutBindings.end(), set.bindings.begin(), set.bindings.end());
+    }
+
     VKBackend::commandPool = VKBackend::createCommandPool(VKBackend::device);
     VKBackend::createCommandBuffers(VKBackend::device, VKBackend::commandPool);
     
-    VkDescriptorSetLayoutBinding uboLayoutBinding;
-    uboLayoutBinding.binding = 0;
-    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    uboLayoutBinding.descriptorCount = 1;
-    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-    uboLayoutBinding.pImmutableSamplers = nullptr;
-
-    VkDescriptorSetLayoutBinding uboLayoutBindingFrag;
-    uboLayoutBindingFrag.binding = 1;
-    uboLayoutBindingFrag.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    uboLayoutBindingFrag.descriptorCount = 1;
-    uboLayoutBindingFrag.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    uboLayoutBindingFrag.pImmutableSamplers = nullptr;
-
-    std::vector<VkDescriptorSetLayoutBinding> layoutBindings = { uboLayoutBinding,uboLayoutBindingFrag };
     VKBackend::createDescriptorSetLayout(layoutBindings);
     
     createUniformBuffers();
