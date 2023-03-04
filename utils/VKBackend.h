@@ -38,6 +38,12 @@ namespace VKBackend
 		VkImageView colorImageView;
 	};
 
+	struct DescriptorSetLayoutData {
+		uint32_t setNumber;
+		VkDescriptorSetLayoutCreateInfo createInfo;
+		std::vector<VkDescriptorSetLayoutBinding> bindings;
+	};
+
 	extern VkInstance vkInstance;
 	extern VkSurfaceKHR surface;
 	extern VkPhysicalDevice physicalDevice;
@@ -88,8 +94,11 @@ namespace VKBackend
 	VkRenderPass createRenerPass(VkDevice device);
 	VkRenderPass createRenderPass1Sample(VkDevice device);
 	VkShaderModule loadShader(VkDevice device, std::string path);
+
+	std::vector<DescriptorSetLayoutData> getDescriptorSetLayoutDataFromSpv(const std::string path);
 	void createDescriptorSetLayout(std::vector <VkDescriptorSetLayoutBinding> layoutBindings);
 	void createDescriptorPool(VkDevice device, std::vector<VkDescriptorPoolSize> poolsizes);
+
 	VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
 	VkFormat findDepthFormat();
 	VkCommandPool createCommandPool(VkDevice device);
@@ -124,6 +133,7 @@ namespace VKBackend
 	VkPipelineDynamicStateCreateInfo getPipelineDynamicState(std::vector<VkDynamicState> &dynamicStates);
 
 	bool supportForDescriptorIndexing(VkPhysicalDevice phyDevice);
+
 }
 
 

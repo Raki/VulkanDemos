@@ -1,4 +1,5 @@
 #include "VKBackend.h"
+#include "spirv_reflect.h"
 
 namespace VKBackend
 {
@@ -489,6 +490,61 @@ namespace VKBackend
 		VK_CHECK(vkCreateShaderModule(device, &createInfo, 0, &shaderModule));
 
 		return shaderModule;
+	}
+
+	std::vector<DescriptorSetLayoutData> getDescriptorSetLayoutDataFromSpv(const std::string path)
+	{
+
+		auto mBytes = Utility::readBinaryFileContents(path);
+
+		assert(mBytes.size() != 0);
+
+		SpvReflectShaderModule module = {};
+		auto result = spvReflectCreateShaderModule(mBytes.size(), mBytes.data(), &module);
+		assert(result == SPV_REFLECT_RESULT_SUCCESS);
+
+		uint32_t count = 0;
+		result = spvReflectEnumerateDescriptorSets(&module, &count, NULL);
+		assert(result == SPV_REFLECT_RESULT_SUCCESS);
+
+		std::vector<SpvReflectDescriptorSet*> sets(count);
+		result = spvReflectEnumerateDescriptorSets(&module, &count, sets.data());
+		assert(result == SPV_REFLECT_RESULT_SUCCESS);
+
+		std::vector<DescriptorSetLayoutData> setLayouts(sets.size(),
+			DescriptorSetLayoutData{});
+
+		for (size_t s=0;s<sets.size();s++)
+		{
+			const SpvReflectDescriptorSet& reflSet = *(sets[s]);
+			DescriptorSetLayoutData& layout = setLayouts[s];
+
+			layout.bindings.resize(reflSet.binding_count);
+			for (size_t b=0;b< reflSet.binding_count;b++)
+			{
+				const SpvReflectDescriptorBinding& reflBinding =
+					*(reflSet.bindings[b]);
+				VkDescriptorSetLayoutBinding& layoutBinding = layout.bindings[b];
+				layoutBinding.binding = reflBinding.binding;
+				layoutBinding.descriptorType = static_cast<VkDescriptorType>(reflBinding.descriptor_type);
+				layoutBinding.descriptorCount = 1;
+
+				for (uint32_t i_dim = 0; i_dim < reflBinding.array.dims_count; ++i_dim) {
+					layoutBinding.descriptorCount *= reflBinding.array.dims[i_dim];
+				}
+				layoutBinding.stageFlags =
+					static_cast<VkShaderStageFlagBits>(module.shader_stage);
+			}
+			layout.setNumber = reflSet.set;
+			layout.createInfo.sType =
+				VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+			layout.createInfo.bindingCount = reflSet.binding_count;
+			layout.createInfo.pBindings = layout.bindings.data();
+		}
+
+		spvReflectDestroyShaderModule(&module);
+
+		return setLayouts;
 	}
 
 	void createDescriptorSetLayout(std::vector <VkDescriptorSetLayoutBinding> layoutBindings)
