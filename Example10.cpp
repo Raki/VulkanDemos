@@ -252,16 +252,17 @@ void initVulkan()
     VKBackend::createDescriptorSetLayout(layoutBindings);
     
     createUniformBuffers();
-    
-    VkDescriptorPoolSize poolSize;
-    poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSize.descriptorCount = static_cast<uint32_t>(VKBackend::swapchainMinImageCount);
 
-    VkDescriptorPoolSize poolSizeUboFrag;
-    poolSizeUboFrag.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSizeUboFrag.descriptorCount = static_cast<uint32_t>(VKBackend::swapchainMinImageCount);
+    std::vector<VkDescriptorPoolSize> poolsizes;
 
-    std::vector<VkDescriptorPoolSize> poolsizes = { poolSize,poolSizeUboFrag };
+    for (const auto& descLayoutBinding : layoutBindings)
+    {
+        VkDescriptorPoolSize poolSize;
+        poolSize.type = descLayoutBinding.descriptorType;
+        poolSize.descriptorCount = static_cast<uint32_t>(VKBackend::swapchainMinImageCount);
+        poolsizes.push_back(poolSize);
+    }
+
     VKBackend::createDescriptorPool(VKBackend::device,poolsizes);
     createDescriptorSets(VKBackend::device);
 
