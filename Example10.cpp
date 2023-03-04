@@ -103,13 +103,14 @@ struct Buffer
 {
     std::vector<VkBuffer> uniformBuffers;
     std::vector<VkDeviceMemory> uniformBufferMemories;
+    VkDeviceSize range;
     bool isDirtry = true;
 };
 
-Buffer uboFrag;
+Buffer uboFrag,uboVert;
 UBOFrag lightInfo;
-std::vector<VkBuffer> uniformBuffers;
-std::vector<VkDeviceMemory> uniformBufferMemories;
+//std::vector<VkBuffer> uniformBuffers;
+//std::vector<VkDeviceMemory> uniformBufferMemories;
 
 std::vector<VKUtility::Vertex> vertices;
 std::vector<uint16_t> indices;
@@ -149,6 +150,7 @@ void destroyVulkan();
 VkSurfaceKHR createSurface(GLFWwindow* window, VkInstance instace);
 void createUniformBuffers();
 void createDescriptorSets(VkDevice device);
+void createDescriptorSets(const VkDevice device, const std::vector<VkDescriptorSetLayoutBinding>& descSetLayoutBindings, const std::vector<Buffer>& uboBuffers);
 VkPipeline createGraphicsPipeline(VkDevice device, VkRenderPass renderPass, VkShaderModule vsModule, VkShaderModule fsModule);
 void createFramebuffers();
 void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
@@ -264,7 +266,9 @@ void initVulkan()
     }
 
     VKBackend::createDescriptorPool(VKBackend::device,poolsizes);
-    createDescriptorSets(VKBackend::device);
+    //createDescriptorSets(VKBackend::device);
+    std::vector<Buffer> ubos = {uboVert,uboFrag};
+    createDescriptorSets(VKBackend::device,layoutBindings,ubos);
 
     VKBackend::graphicsPipeline = createGraphicsPipeline(VKBackend::device, VKBackend::renderPass, triangleVS, triangleFS);
 
@@ -352,8 +356,11 @@ void destroyVulkan()
 
     for (size_t i = 0; i < VKBackend::swapchainMinImageCount; i++)
     {
-        vkDestroyBuffer(VKBackend::device, uniformBuffers.at(i), nullptr);
-        vkFreeMemory(VKBackend::device, uniformBufferMemories.at(i), nullptr);
+        vkDestroyBuffer(VKBackend::device, uboVert.uniformBuffers.at(i), nullptr);
+        vkFreeMemory(VKBackend::device, uboVert.uniformBufferMemories.at(i), nullptr);
+
+        vkDestroyBuffer(VKBackend::device, uboFrag.uniformBuffers.at(i), nullptr);
+        vkFreeMemory(VKBackend::device, uboFrag.uniformBufferMemories.at(i), nullptr);
     }
 
 
@@ -372,19 +379,64 @@ VkSurfaceKHR createSurface(GLFWwindow* window, VkInstance instance)
 }
 void createUniformBuffers()
 {
+    uboFrag.range = sizeof(UBOFrag);
     uboFrag.uniformBuffers.resize(VKBackend::swapchainMinImageCount);
     uboFrag.uniformBufferMemories.resize(VKBackend::swapchainMinImageCount);
     
-    uniformBuffers.resize(VKBackend::swapchainMinImageCount);
-    uniformBufferMemories.resize(VKBackend::swapchainMinImageCount);
+    uboVert.range = sizeof(UniformBufferObject);
+    uboVert.uniformBuffers.resize(VKBackend::swapchainMinImageCount);
+    uboVert.uniformBufferMemories.resize(VKBackend::swapchainMinImageCount);
 
     for (size_t i = 0; i < VKBackend::swapchainMinImageCount; i++)
     {
        VkDeviceSize bufferSize = sizeof(UniformBufferObject);
-       VKBackend::createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers.at(i), uniformBufferMemories.at(i));
+       VKBackend::createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uboVert.uniformBuffers.at(i), uboVert.uniformBufferMemories.at(i));
 
        bufferSize = sizeof(UBOFrag);
        VKBackend::createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uboFrag.uniformBuffers.at(i), uboFrag.uniformBufferMemories.at(i));
+    }
+}
+
+/*
+* This is incomplete. On supports descriptors of type buffers.
+*/
+void createDescriptorSets(const VkDevice device,const std::vector<VkDescriptorSetLayoutBinding> &descSetLayoutBindings,
+    const std::vector<Buffer> &uboBuffers)
+{
+    std::vector<VkDescriptorSetLayout> layouts(VKBackend::swapchainMinImageCount, VKBackend::descriptorSetLayout);
+    VkDescriptorSetAllocateInfo allocateInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+    allocateInfo.descriptorPool = VKBackend::descriptorPool;
+    allocateInfo.descriptorSetCount = static_cast<uint32_t>(3);
+    allocateInfo.pSetLayouts = layouts.data();;
+
+    VKBackend::descriptorSets.resize(VKBackend::swapchainMinImageCount);
+
+    if (vkAllocateDescriptorSets(device, &allocateInfo, VKBackend::descriptorSets.data()) != VK_SUCCESS)
+    {
+        throw std::runtime_error("failed to allocate descriptor sets!");
+    }
+
+    for (size_t i = 0; i < VKBackend::swapchainMinImageCount; i++)
+    {
+        std::vector<VkDescriptorBufferInfo> bufferInfos(descSetLayoutBindings.size());
+        std::vector<VkWriteDescriptorSet> descriptorWrites(descSetLayoutBindings.size());
+        for (size_t b = 0; b < descSetLayoutBindings.size(); b++)
+        {
+            bufferInfos.at(b) = {};
+            bufferInfos.at(b).buffer = uboBuffers.at(b).uniformBuffers.at(i);
+            bufferInfos.at(b).offset = 0;
+            bufferInfos.at(b).range = uboBuffers.at(b).range;
+
+            descriptorWrites.at(b).sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites.at(b).dstSet = VKBackend::descriptorSets[i];
+            descriptorWrites.at(b).dstBinding = descSetLayoutBindings.at(b).binding;
+            descriptorWrites.at(b).dstArrayElement = 0;
+            descriptorWrites.at(b).descriptorType = descSetLayoutBindings.at(b).descriptorType;
+            descriptorWrites.at(b).descriptorCount = descSetLayoutBindings.at(b).descriptorCount;
+            descriptorWrites.at(b).pBufferInfo = &bufferInfos.at(b);
+        }
+
+        vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
     }
 }
 void createDescriptorSets(VkDevice device)
@@ -405,7 +457,7 @@ void createDescriptorSets(VkDevice device)
     for (size_t i = 0; i < VKBackend::swapchainMinImageCount; i++)
     {
         VkDescriptorBufferInfo bufferInfo{};
-        bufferInfo.buffer = uniformBuffers[i];
+        bufferInfo.buffer = uboVert.uniformBuffers[i];
         bufferInfo.offset = 0;
         bufferInfo.range = sizeof(UniformBufferObject);
 
@@ -653,9 +705,9 @@ void updateUniformBuffer(uint32_t currentImage)
     ubo.proj[1][1] *= -1;
 
     void* data;
-    vkMapMemory(VKBackend::device, uniformBufferMemories[currentImage], 0, sizeof(ubo), 0, &data);
+    vkMapMemory(VKBackend::device, uboVert.uniformBufferMemories[currentImage], 0, sizeof(ubo), 0, &data);
     memcpy(data, &ubo, sizeof(ubo));
-    vkUnmapMemory(VKBackend::device, uniformBufferMemories[currentImage]);
+    vkUnmapMemory(VKBackend::device, uboVert.uniformBufferMemories[currentImage]);
 
     if (uboFrag.isDirtry)
     {
