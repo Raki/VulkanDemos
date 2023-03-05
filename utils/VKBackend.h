@@ -94,8 +94,10 @@ namespace VKBackend
 	VkRenderPass createRenerPass(VkDevice device);
 	VkRenderPass createRenderPass1Sample(VkDevice device);
 	VkShaderModule loadShader(VkDevice device, std::string path);
+	VkShaderModule loadShader(VkDevice device, const std::vector<unsigned char> &fileContent);
 
 	std::vector<DescriptorSetLayoutData> getDescriptorSetLayoutDataFromSpv(const std::string path);
+	std::vector<DescriptorSetLayoutData> getDescriptorSetLayoutDataFromSpv(const std::vector<unsigned char> &fileContent);
 	void createDescriptorSetLayout(std::vector <VkDescriptorSetLayoutBinding> layoutBindings);
 	void createDescriptorPool(VkDevice device, std::vector<VkDescriptorPoolSize> poolsizes);
 

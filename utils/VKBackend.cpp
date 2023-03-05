@@ -480,8 +480,11 @@ namespace VKBackend
 	{
 		auto fileContent = Utility::readBinaryFileContents(path);
 
-		//assert(fileContent.size() % 4 == 0);
+		return loadShader(device, fileContent);
+	}
 
+	VkShaderModule loadShader(VkDevice device, const std::vector<unsigned char>& fileContent)
+	{
 		VkShaderModule shaderModule;
 		VkShaderModuleCreateInfo createInfo = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
 		createInfo.codeSize = fileContent.size();
@@ -497,10 +500,15 @@ namespace VKBackend
 
 		auto mBytes = Utility::readBinaryFileContents(path);
 
-		assert(mBytes.size() != 0);
+		return getDescriptorSetLayoutDataFromSpv(mBytes);
+	}
+
+	std::vector<DescriptorSetLayoutData> getDescriptorSetLayoutDataFromSpv(const std::vector<unsigned char>& fileContent)
+	{
+		assert(fileContent.size() != 0);
 
 		SpvReflectShaderModule module = {};
-		auto result = spvReflectCreateShaderModule(mBytes.size(), mBytes.data(), &module);
+		auto result = spvReflectCreateShaderModule(fileContent.size(), fileContent.data(), &module);
 		assert(result == SPV_REFLECT_RESULT_SUCCESS);
 
 		uint32_t count = 0;
@@ -514,13 +522,13 @@ namespace VKBackend
 		std::vector<DescriptorSetLayoutData> setLayouts(sets.size(),
 			DescriptorSetLayoutData{});
 
-		for (size_t s=0;s<sets.size();s++)
+		for (size_t s = 0; s < sets.size(); s++)
 		{
 			const SpvReflectDescriptorSet& reflSet = *(sets[s]);
 			DescriptorSetLayoutData& layout = setLayouts[s];
 
 			layout.bindings.resize(reflSet.binding_count);
-			for (size_t b=0;b< reflSet.binding_count;b++)
+			for (size_t b = 0; b < reflSet.binding_count; b++)
 			{
 				const SpvReflectDescriptorBinding& reflBinding =
 					*(reflSet.bindings[b]);
