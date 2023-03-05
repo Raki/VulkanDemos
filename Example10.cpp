@@ -103,8 +103,21 @@ struct Buffer
 {
     std::vector<VkBuffer> uniformBuffers;
     std::vector<VkDeviceMemory> uniformBufferMemories;
-    VkDeviceSize range;
+    VkDeviceSize range=0;
     bool isDirtry = true;
+};
+
+struct Image
+{
+    VkDeviceMemory imageMemory;
+    VkImageView imageView;
+};
+
+struct Descriptor
+{
+    VkDescriptorSetLayoutBinding layout;
+    std::shared_ptr<Buffer> buffer;
+    std::shared_ptr<Image> image;
 };
 
 Buffer uboFrag,uboVert;
@@ -228,13 +241,17 @@ void initVulkan()
 
     VKBackend::renderPass = VKBackend::createRenerPass(VKBackend::device);
 
-    auto triangleVS = VKBackend::loadShader(VKBackend::device, "shaders/solidShapes3D.vert.spv");
+
+    auto vsFileContent = Utility::readBinaryFileContents("shaders/solidShapes3D.vert.spv");
+    auto fsFileContent = Utility::readBinaryFileContents("shaders/solidShapes3D.frag.spv");
+
+    auto triangleVS = VKBackend::loadShader(VKBackend::device, vsFileContent);
     assert(triangleVS);
-    auto triangleFS = VKBackend::loadShader(VKBackend::device, "shaders/solidShapes3D.frag.spv");
+    auto triangleFS = VKBackend::loadShader(VKBackend::device, fsFileContent);
     assert(triangleFS);
 
-    auto setsV = VKBackend::getDescriptorSetLayoutDataFromSpv("shaders/solidShapes3D.vert.spv");
-    auto setsF = VKBackend::getDescriptorSetLayoutDataFromSpv("shaders/solidShapes3D.frag.spv");
+    auto setsV = VKBackend::getDescriptorSetLayoutDataFromSpv(vsFileContent);
+    auto setsF = VKBackend::getDescriptorSetLayoutDataFromSpv(fsFileContent);
 
     std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
 
