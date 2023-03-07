@@ -26,7 +26,12 @@ vec3 getDiffuseColrVertex()
 	return lInfo.color.xyz*getDiffuseFactr();
 }
 
+vec3 getAmbientColor()
+{
+	return vec3(0.2);
+}
+
 void main()
 {
-    outColor = vec4(getDiffuseColrVertex(),1.0);
+    outColor = vec4(getDiffuseColrVertex()+getAmbientColor(),1.0);
 }
