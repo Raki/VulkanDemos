@@ -158,6 +158,7 @@ struct FiveColors
 void createWindow();
 void initVulkan();
 void updateFrame();
+void compileShaders();
 void destroyVulkan();
 
 VkSurfaceKHR createSurface(GLFWwindow* window, VkInstance instace);
@@ -310,6 +311,14 @@ void updateFrame()
     }
     
    
+}
+void compileShaders()
+{
+    //ToDo : Compile only file content is changed
+    auto res = system("glslangValidator.exe -V ./shaders/solidShapes3D.frag.glsl -o ./shaders/solidShapes3D.frag.spv");
+    assert(res == 0);
+    res = system("glslangValidator.exe -V ./shaders/solidShapes3D.vert.glsl -o ./shaders/solidShapes3D.vert.spv");
+    assert(res == 0);
 }
 void destroyVulkan()
 {
@@ -714,7 +723,7 @@ void updateUniformBuffer(uint32_t currentImage)
     UniformBufferObject ubo;
     //ubo.model = glm::mat4(1.0f);
     ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(time*5), glm::vec3(0.0f, 1.0f, 0.0f));
-    ubo.view = glm::lookAt(glm::vec3(0.0f, 15.f, 50.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    ubo.view = glm::lookAt(glm::vec3(0.0f, 5.f, 10.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
     ubo.proj = glm::perspective(glm::radians(45.0f), VKBackend::swapChainExtent.width / (float)VKBackend::swapChainExtent.height, 0.1f, 500.0f);
 
     auto mv = ubo.model;
@@ -969,8 +978,8 @@ void setupScene()
     std::vector<VKUtility::VDPosNorm> verts;
     std::vector<uint16_t> inds;
 
-    const int rows = 50;
-    const int cols = 50;
+    const int rows = 2;
+    const int cols = 2;
 
     glm::vec3 origin = glm::vec3(-rows / 2, 0, -cols / 2);
     for (int row = 0; row < rows; row++)
@@ -999,12 +1008,10 @@ void setupScene()
 
 #pragma endregion functions
 
-/*
-* Goal of this demo is to explore descriptor indexing
-*/
 
 int main()
 {
+    compileShaders();
     createWindow();
     initVulkan();
 
