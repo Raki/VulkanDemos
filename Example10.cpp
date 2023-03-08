@@ -326,12 +326,13 @@ void compileShaders()
         rapidjson::Document doc;
         doc.Parse(content.c_str());
 
+        bool needsUpdate = true;
         if (doc.IsArray())
         {
             auto arr = doc.GetArray();
-            for (rapidjson::Value::ConstValueIterator itr = arr.Begin(); itr != arr.End(); ++itr)
+            for (rapidjson::Value::ValueIterator itr = arr.Begin(); itr != arr.End(); ++itr)
             {
-                for (rapidjson::Value::ConstMemberIterator itrMem =itr->MemberBegin();itrMem!=itr->MemberEnd();itrMem++)
+                for (rapidjson::Value::MemberIterator itrMem =itr->MemberBegin();itrMem!=itr->MemberEnd();itrMem++)
                 {
                     std::filesystem::path fPath(itrMem->name.GetString());
                     long long ct = std::stoll(itrMem->value.GetString());
@@ -344,17 +345,31 @@ void compileShaders()
                         {
                             std::filesystem::path nPath(fPath);
                             std::filesystem::path ext(".spv");
-                            fmt::print("compile {}\n",fPath.string());
+                            fmt::print("compiling {}\n",fPath.string());
                             nPath.replace_extension(ext);
                             
                             std::string cmd = "glslangValidator.exe -V " + fPath.string() + " -o "+nPath.string();
                             auto res = system(cmd.c_str());
                             assert(res == 0);
                             //ToDo : update the json file
+                            itrMem->value.SetString(std::to_string(c).c_str(),doc.GetAllocator());
+                            needsUpdate = true;
                         }
                     }
                 }
             }
+        }
+        if (needsUpdate)
+        {
+            rapidjson::StringBuffer strbuf;
+            rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(strbuf);
+            doc.Accept(writer);
+
+            auto res = strbuf.GetString();
+
+            std::ofstream file("spvState.json");
+            file << res;
+            file.close();
         }
     }
     else
@@ -399,10 +414,10 @@ void compileShaders()
     }
     //rapidjson::
     //ToDo : Compile only file content is changed
-    auto res = system("glslangValidator.exe -V ./shaders/solidShapes3D.frag.glsl -o ./shaders/solidShapes3D.frag.spv");
+   /* auto res = system("glslangValidator.exe -V ./shaders/solidShapes3D.frag.glsl -o ./shaders/solidShapes3D.frag.spv");
     assert(res == 0);
     res = system("glslangValidator.exe -V ./shaders/solidShapes3D.vert.glsl -o ./shaders/solidShapes3D.vert.spv");
-    assert(res == 0);
+    assert(res == 0);*/
 }
 void destroyVulkan()
 {
