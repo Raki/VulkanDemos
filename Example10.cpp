@@ -9,6 +9,11 @@
 #include <imgui.h>
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_vulkan.h"
+#include <rapidjson/rapidjson.h>
+#include <rapidjson/document.h>
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/prettywriter.h>
+#include <filesystem>
 
 #pragma region vars
 const int MAX_FRAMES_IN_FLIGHT = 2;
@@ -314,6 +319,67 @@ void updateFrame()
 }
 void compileShaders()
 {
+    std::filesystem::path spvState("spvState.json");
+    if (std::filesystem::exists(spvState))
+    {
+        auto content = Utility::readTxtFileContents(spvState.string());
+        rapidjson::Document doc;
+        doc.Parse(content.c_str());
+
+        if (doc.IsArray())
+        {
+            auto arr = doc.GetArray();
+            for (rapidjson::Value::ConstValueIterator itr = arr.Begin(); itr != arr.End(); ++itr)
+            {
+                for (rapidjson::Value::ConstMemberIterator itrMem =itr->MemberBegin();itrMem!=itr->MemberEnd();itrMem++)
+                {
+                    fmt::print("name {}\t",itrMem->name.GetString());
+                    fmt::print("value {}\n", itrMem->value.GetString());
+                }
+            }
+        }
+    }
+    else
+    {
+        rapidjson::Document doc;
+        doc.SetArray();
+
+        rapidjson::Document::AllocatorType& allocator = doc.GetAllocator();
+
+        std::filesystem::path fs("shaders/solidShapes3D.frag.glsl");
+        std::filesystem::path vs("shaders/solidShapes3D.vert.glsl");
+
+        std::vector<std::filesystem::path> paths = {vs,fs};
+
+        for (const auto& pth : paths)
+        {
+            if (std::filesystem::exists(pth))
+            {
+                rapidjson::Value obj(rapidjson::kObjectType);
+                
+                auto t = std::filesystem::last_write_time(pth);
+                auto c = t.time_since_epoch().count();
+                
+                rapidjson::Value key(pth.string().c_str(), allocator);
+                rapidjson::Value val(std::to_string(c).c_str(), allocator);
+                obj.AddMember(key, val, allocator);
+
+                doc.PushBack(obj, allocator);
+            }
+        }
+     
+        // Convert JSON document to string
+        rapidjson::StringBuffer strbuf;
+        rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(strbuf);
+        doc.Accept(writer);
+
+        auto res  = strbuf.GetString();
+
+        std::ofstream file("spvState.json");
+        file << res;
+        file.close();
+    }
+    //rapidjson::
     //ToDo : Compile only file content is changed
     auto res = system("glslangValidator.exe -V ./shaders/solidShapes3D.frag.glsl -o ./shaders/solidShapes3D.frag.spv");
     assert(res == 0);
