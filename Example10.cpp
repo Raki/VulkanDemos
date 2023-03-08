@@ -333,8 +333,26 @@ void compileShaders()
             {
                 for (rapidjson::Value::ConstMemberIterator itrMem =itr->MemberBegin();itrMem!=itr->MemberEnd();itrMem++)
                 {
-                    fmt::print("name {}\t",itrMem->name.GetString());
-                    fmt::print("value {}\n", itrMem->value.GetString());
+                    std::filesystem::path fPath(itrMem->name.GetString());
+                    long long ct = std::stoll(itrMem->value.GetString());
+
+                    if (std::filesystem::exists(fPath))
+                    {
+                        auto t = std::filesystem::last_write_time(fPath);
+                        auto c = t.time_since_epoch().count();
+                        if (c > ct)
+                        {
+                            std::filesystem::path nPath(fPath);
+                            std::filesystem::path ext(".spv");
+                            fmt::print("compile {}\n",fPath.string());
+                            nPath.replace_extension(ext);
+                            
+                            std::string cmd = "glslangValidator.exe -V " + fPath.string() + " -o "+nPath.string();
+                            auto res = system(cmd.c_str());
+                            assert(res == 0);
+                            //ToDo : update the json file
+                        }
+                    }
                 }
             }
         }
