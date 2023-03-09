@@ -47,6 +47,54 @@ struct VKMesh
     VkDeviceMemory vertexBufferMemory;
     VkBuffer indexBuffer;
     VkDeviceMemory indexBufferMemory;
+    
+    std::shared_ptr<VKUtility::Mesh> meshData;
+
+    void createBuffers(const VkDevice& device)
+    {
+        //size of buffers
+        VkDeviceSize vBuffSize = sizeof(VKUtility::Vertex) * meshData->vData.size();
+        VkDeviceSize iBuffSize = sizeof(uint16_t) * meshData->iData.size();
+
+        //staging buffer
+        VkBuffer vStageBuff, iStageBuff;
+        VkDeviceMemory vStageBuffMemory, iStageBuffMemory;
+
+        VKBackend::createBuffer(vBuffSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, vStageBuff, vStageBuffMemory);
+        void* data;
+        vkMapMemory(device, vStageBuffMemory, 0, vBuffSize, 0, &data);
+        memcpy(data, meshData->vData.data(), (size_t)vBuffSize);
+        vkUnmapMemory(device, vStageBuffMemory);
+
+        VKBackend::createBuffer(iBuffSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, iStageBuff, iStageBuffMemory);
+        void* iData;
+        vkMapMemory(device, iStageBuffMemory, 0, iBuffSize, 0, &iData);
+        memcpy(iData, meshData->iData.data(), (size_t)iBuffSize);
+        vkUnmapMemory(device, iStageBuffMemory);
+
+        //create device memory backed buffer
+        VKBackend::createBuffer(vBuffSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
+        VKBackend::createBuffer(iBuffSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
+
+        //transfer memory from staging to device memory backed buffer
+
+        VkCommandBuffer commandBuffer = VKBackend::beginSingleTimeCommands();
+
+        VkBufferCopy copyRegion{}, copyRegionIndex{};
+        copyRegion.size = vBuffSize;
+        copyRegionIndex.size = iBuffSize;
+
+        vkCmdCopyBuffer(commandBuffer, vStageBuff, vertexBuffer, 1, &copyRegion);
+        vkCmdCopyBuffer(commandBuffer, iStageBuff, indexBuffer, 1, &copyRegionIndex);
+
+        VKBackend::endSingleTimeCommands(commandBuffer);
+
+        vkDestroyBuffer(device, vStageBuff, nullptr);
+        vkFreeMemory(device, vStageBuffMemory, nullptr);
+
+        vkDestroyBuffer(device, iStageBuff, nullptr);
+        vkFreeMemory(device, iStageBuffMemory, nullptr);
+    }
 };
 
 struct VKMesh3D : VKMesh
@@ -109,13 +157,17 @@ struct Buffer
     std::vector<VkBuffer> uniformBuffers;
     std::vector<VkDeviceMemory> uniformBufferMemories;
     VkDeviceSize range=0;
+    std::vector<VkDescriptorBufferInfo> bufferInfo;
     bool isDirtry = true;
 };
 
 struct Image
 {
-    VkDeviceMemory imageMemory;
+    VkImage image;
     VkImageView imageView;
+    VkDeviceMemory imageMemory;
+    VkSampler textureSampler;
+    std::vector<VkDescriptorImageInfo> imageInfo;
 };
 
 struct Descriptor
@@ -138,8 +190,7 @@ VkDeviceMemory depthImageMemory;
 VkImageView depthImageView;
 
 std::shared_ptr<VKBackend::VKRenderTarget> msColorAttch;
-std::vector<std::shared_ptr<VKMesh3D>> shapes;
-std::shared_ptr<VKMesh3D> cube;
+std::vector<std::shared_ptr<VKMesh>> cubes;
 std::chrono::system_clock::time_point lastTime{};
 
 struct FiveColors
@@ -170,6 +221,7 @@ VkSurfaceKHR createSurface(GLFWwindow* window, VkInstance instace);
 void createUniformBuffers();
 void createDescriptorSets(VkDevice device);
 void createDescriptorSets(const VkDevice device, const std::vector<VkDescriptorSetLayoutBinding>& descSetLayoutBindings, const std::vector<Buffer>& uboBuffers);
+void createDescriptorSets(const VkDevice device, const std::vector<VkDescriptorSetLayoutBinding>& descSetLayoutBindings, const std::vector<Descriptor>& descriptors);
 VkPipeline createGraphicsPipeline(VkDevice device, VkRenderPass renderPass, VkShaderModule vsModule, VkShaderModule fsModule);
 void createFramebuffers();
 void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
@@ -179,6 +231,7 @@ void createDepthResources();
 void createColorResource();
 void fillCube(float width, float height, float depth,glm::mat4 tMat, std::vector<VKUtility::VDPosNorm>& verts, std::vector<uint16_t>& indices);
 void setupScene();
+void setupCubes();
 #pragma endregion prototypes
 
 #pragma region functions
@@ -453,7 +506,7 @@ void destroyVulkan()
     }*/
 
     //if (circle != nullptr)
-    for(auto shape : shapes)
+    for(auto shape : cubes)
     {
         vkDestroyBuffer(VKBackend::device, shape->vertexBuffer, nullptr);
         vkFreeMemory(VKBackend::device, shape->vertexBufferMemory, nullptr);
@@ -564,6 +617,54 @@ void createDescriptorSets(const VkDevice device,const std::vector<VkDescriptorSe
         vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
     }
 }
+void createDescriptorSets(const VkDevice device, const std::vector<Descriptor>& descriptors)
+{
+    std::vector<VkDescriptorSetLayout> layouts(VKBackend::swapchainMinImageCount, VKBackend::descriptorSetLayout);
+    VkDescriptorSetAllocateInfo allocateInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+    allocateInfo.descriptorPool = VKBackend::descriptorPool;
+    allocateInfo.descriptorSetCount = static_cast<uint32_t>(3);
+    allocateInfo.pSetLayouts = layouts.data();;
+
+    VKBackend::descriptorSets.resize(VKBackend::swapchainMinImageCount);
+
+    if (vkAllocateDescriptorSets(device, &allocateInfo, VKBackend::descriptorSets.data()) != VK_SUCCESS)
+    {
+        throw std::runtime_error("failed to allocate descriptor sets!");
+    }
+
+    for (size_t i = 0; i < VKBackend::swapchainMinImageCount; i++)
+    {
+        std::vector<VkWriteDescriptorSet> descriptorWrites(descriptors.size());
+
+        for (size_t d = 0; d < descriptors.size(); d++)
+        {
+            descriptorWrites.at(d).sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites.at(d).dstSet = VKBackend::descriptorSets[i];
+            descriptorWrites.at(d).dstBinding = descriptors.at(d).layout.binding;
+            descriptorWrites.at(d).dstArrayElement = 0;
+            descriptorWrites.at(d).descriptorType = descriptors.at(d).layout.descriptorType;
+            descriptorWrites.at(d).descriptorCount = descriptors.at(d).layout.descriptorCount;
+            if (descriptors.at(d).layout.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+            {
+                descriptors.at(d).buffer->bufferInfo.at(i).buffer = descriptors.at(d).buffer->uniformBuffers.at(i);
+                descriptors.at(d).buffer->bufferInfo.at(i).offset = 0;
+                descriptors.at(d).buffer->bufferInfo.at(i).range = descriptors.at(d).buffer->range;
+                descriptorWrites.at(d).pBufferInfo = &descriptors.at(d).buffer->bufferInfo.at(i);
+            }
+            else if (descriptors.at(d).layout.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+            {
+                descriptors.at(d).image->imageInfo.at(d).imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                descriptors.at(d).image->imageInfo.at(d).imageView = descriptors.at(d).image->imageView;// texture0->textureImageView;
+                descriptors.at(d).image->imageInfo.at(d).sampler = descriptors.at(d).image->textureSampler;
+                descriptorWrites.at(d).pImageInfo = &descriptors.at(d).image->imageInfo.at(i);
+            }
+            
+        }
+
+
+        vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+    }
+}
 void createDescriptorSets(VkDevice device)
 {
     std::vector<VkDescriptorSetLayout> layouts(VKBackend::swapchainMinImageCount, VKBackend::descriptorSetLayout);
@@ -644,8 +745,8 @@ VkPipeline createGraphicsPipeline(VkDevice device, VkRenderPass renderPass, VkSh
     stages[1] = VKBackend::getPipelineShaderStage(VK_SHADER_STAGE_FRAGMENT_BIT, fsModule);
     
 
-    auto vertBindingDesc = VKUtility::VDPosNorm::getBindingDescription();
-    auto vertAttribDescs = VKUtility::VDPosNorm::getAttributeDescriptions();
+    auto vertBindingDesc = VKUtility::Vertex::getBindingDescription();
+    auto vertAttribDescs = VKUtility::Vertex::getAttributeDescriptions();
 
     auto vertexInputInfo = VKBackend::getPipelineVertexInputState(1, &vertBindingDesc,static_cast<uint32_t>(vertAttribDescs.size()),
         vertAttribDescs.data());
@@ -790,9 +891,9 @@ void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex)
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, VKBackend::pipelineLayout, 0, 1, &VKBackend::descriptorSets[imageIndex], 0, nullptr);
-    //for (const auto shape : shapes)
+    for (const auto& shape : cubes)
     {
-        std::shared_ptr<VKMesh3D> shape = cube;
+        //std::shared_ptr<VKMesh3D> shape = cube;
         VkBuffer vertexBuffers[] = { shape->vertexBuffer };
         VkDeviceSize offsets[] = { 0 };
 
@@ -1072,13 +1173,13 @@ void fillCube(float width, float height, float depth,glm::mat4 tMat, std::vector
 }
 void setupScene()
 {
-    cube = std::make_shared<VKMesh3D>();
+   /* cube = std::make_shared<VKMesh3D>();
 
     std::vector<VKUtility::VDPosNorm> verts;
     std::vector<uint16_t> inds;
 
-    const int rows = 2;
-    const int cols = 2;
+    const int rows = 1;
+    const int cols = 1;
 
     glm::vec3 origin = glm::vec3(-rows / 2, 0, -cols / 2);
     for (int row = 0; row < rows; row++)
@@ -1098,13 +1199,24 @@ void setupScene()
     cube->createBuffers(VKBackend::device);
     cube->tMatrix = glm::mat4(1);
 
-    shapes.push_back(cube);
+    shapes.push_back(cube);*/
+    setupCubes();
 
     lightInfo.position = glm::vec4(0, 20, 0, 0);
     lightInfo.color = glm::vec4(0.5, 0.5, 1.f, 1.0f);
     
 }
+void setupCubes()
+{
+    auto cubeMesh = VKUtility::getCube(3, 3, 3);
+    auto cube = std::make_shared<VKMesh>();
+    cube->meshData = cubeMesh;
+    cube->createBuffers(VKBackend::device);
+    cube->tMatrix = glm::mat4(1);
 
+    cubes.push_back(cube);
+    
+}
 #pragma endregion functions
 
 
