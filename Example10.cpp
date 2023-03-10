@@ -19,6 +19,12 @@
 const int MAX_FRAMES_IN_FLIGHT = 2;
 const int WIN_WIDTH = 1024;
 const int WIN_HEIGHT = 1024;
+
+#define VERT_SHADER_SPV "shaders/simpleMat.vert.spv"
+#define FRAG_SHADER_SPV "shaders/simpleMat.frag.spv"
+#define VERT_SHADER_GLSL "shaders/simpleMat.vert.glsl"
+#define FRAG_SHADER_GLSL "shaders/simpleMat.frag.glsl"
+
 GLFWwindow* window;
 auto closeWindow = false;
 
@@ -316,8 +322,8 @@ void initVulkan()
     VKBackend::renderPass = VKBackend::createRenerPass(VKBackend::device);
 
 
-    auto vsFileContent = Utility::readBinaryFileContents("shaders/simpleMat.vert.spv");
-    auto fsFileContent = Utility::readBinaryFileContents("shaders/simpleMat.frag.spv");
+    auto vsFileContent = Utility::readBinaryFileContents(VERT_SHADER_SPV);
+    auto fsFileContent = Utility::readBinaryFileContents(FRAG_SHADER_SPV);
 
     auto triangleVS = VKBackend::loadShader(VKBackend::device, vsFileContent);
     assert(triangleVS);
@@ -485,8 +491,8 @@ void compileShaders()
 
         rapidjson::Document::AllocatorType& allocator = doc.GetAllocator();
 
-        std::filesystem::path fs("shaders/simpleMat.frag.glsl");
-        std::filesystem::path vs("shaders/simpleMat.vert.glsl");
+        std::filesystem::path fs(VERT_SHADER_GLSL);
+        std::filesystem::path vs(FRAG_SHADER_GLSL);
 
         std::vector<std::filesystem::path> paths = {vs,fs};
 
@@ -637,7 +643,7 @@ void createUniformBuffers()
 }
 
 /*
-* This is incomplete. On supports descriptors of type buffers.
+* This is incomplete. Only supports descriptors of type buffers.
 */
 void createDescriptorSets(const VkDevice device,const std::vector<VkDescriptorSetLayoutBinding> &descSetLayoutBindings,
     const std::vector<Buffer> &uboBuffers)
