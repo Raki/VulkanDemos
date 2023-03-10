@@ -44,5 +44,8 @@ Simple clock. This demo uses push constants for per object transformations
 
 * Example 10
 
- Goal of this program is to explore SPIRV-Reflect
- https://github.com/KhronosGroup/SPIRV-Reflect
+  Goal of this program is to explore SPIRV-Reflect https://github.com/KhronosGroup/SPIRV-Reflect
+
+  Trivial logic to re-compile shaders to spirv at the time of project build, when changes were saved.
+
+  Deletion of vulkan resources based on descriptors created.(UBOs & Images supported for now) 
