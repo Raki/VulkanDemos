@@ -213,6 +213,7 @@ std::vector<std::shared_ptr<VKMesh>> cubes;
 std::chrono::system_clock::time_point lastTime{};
 
 std::shared_ptr<VKBackend::VKTexture> texture;
+std::vector<Descriptor> descriptors;
 
 struct FiveColors
 {
@@ -364,8 +365,6 @@ void initVulkan()
 
     VKBackend::createDescriptorPool(VKBackend::device,poolsizes);
 
-    std::vector<Descriptor> descriptors;
-    
     texture = VKBackend::createVKTexture("img/sample.jpg");
     auto image = std::make_shared<Image>();
     image->texContainer = texture;
@@ -556,14 +555,6 @@ void destroyVulkan()
 
     vkDestroySwapchainKHR(VKBackend::device, VKBackend::swapchain, nullptr);
 
-    /*if(polyline!=nullptr)
-    {
-        vkDestroyBuffer(VKBackend::device, polyline->vertexBuffer, nullptr);
-        vkFreeMemory(VKBackend::device, polyline->vertexBufferMemory, nullptr);
-        vkDestroyBuffer(VKBackend::device, polyline->indexBuffer, nullptr);
-        vkFreeMemory(VKBackend::device, polyline->indexBufferMemory, nullptr);
-    }*/
-
     //if (circle != nullptr)
     for(auto shape : cubes)
     {
@@ -573,16 +564,6 @@ void destroyVulkan()
         vkFreeMemory(VKBackend::device, shape->indexBufferMemory, nullptr);
     }
 
-    /*vkDestroySampler(VKBackend::device, texture0->textureSampler, nullptr);
-    vkDestroyImageView(VKBackend::device, texture0->textureImageView, nullptr);
-    vkDestroyImage(VKBackend::device, texture0->textureImage, nullptr);
-    vkFreeMemory(VKBackend::device, texture0->textureImageMemory, nullptr);
-
-    vkDestroySampler(VKBackend::device, texture->textureSampler, nullptr);
-    vkDestroyImageView(VKBackend::device, texture->textureImageView, nullptr);
-    vkDestroyImage(VKBackend::device, texture->textureImage, nullptr);
-    vkFreeMemory(VKBackend::device, texture->textureImageMemory, nullptr);*/
-
     vkDestroyImageView(VKBackend::device, depthImageView, nullptr);
     vkDestroyImage(VKBackend::device, depthImage, nullptr);
     vkFreeMemory(VKBackend::device, depthImageMemory, nullptr);
@@ -591,15 +572,25 @@ void destroyVulkan()
     vkDestroyImage(VKBackend::device, msColorAttch->colorImage, nullptr);
     vkFreeMemory(VKBackend::device, msColorAttch->colorImageMemory, nullptr);
 
-    for (size_t i = 0; i < VKBackend::swapchainMinImageCount; i++)
+    for (size_t i=0;i<descriptors.size();i++)
     {
-        vkDestroyBuffer(VKBackend::device, uboVert.uniformBuffers.at(i), nullptr);
-        vkFreeMemory(VKBackend::device, uboVert.uniformBufferMemories.at(i), nullptr);
-
-        vkDestroyBuffer(VKBackend::device, uboFrag.uniformBuffers.at(i), nullptr);
-        vkFreeMemory(VKBackend::device, uboFrag.uniformBufferMemories.at(i), nullptr);
+        auto desc = descriptors.at(i);
+        if (desc.layout.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+        {
+            for (size_t u = 0; u < desc.buffer->uniformBuffers.size(); u++)
+            {
+                vkDestroyBuffer(VKBackend::device, desc.buffer->uniformBuffers.at(u), nullptr);
+                vkFreeMemory(VKBackend::device, desc.buffer->uniformBufferMemories.at(u), nullptr);
+            }
+        }
+        else if (desc.layout.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+        {
+            vkDestroyImageView(VKBackend::device, desc.image->texContainer->textureImageView, nullptr);
+            vkDestroyImage(VKBackend::device, desc.image->texContainer->textureImage, nullptr);
+            vkFreeMemory(VKBackend::device, desc.image->texContainer->textureImageMemory, nullptr);
+            vkDestroySampler(VKBackend::device, desc.image->texContainer->textureSampler, nullptr);
+        }
     }
-
 
     vkDestroyDescriptorPool(VKBackend::device, VKBackend::descriptorPool, nullptr);
     vkDestroyDescriptorSetLayout(VKBackend::device, VKBackend::descriptorSetLayout, nullptr);
@@ -639,49 +630,6 @@ void createUniformBuffers()
        uboFrag.bufferInfo.at(i).buffer = uboFrag.uniformBuffers.at(i);
        uboFrag.bufferInfo.at(i).offset = 0;
        uboFrag.bufferInfo.at(i).range = uboFrag.range;
-    }
-}
-
-/*
-* This is incomplete. Only supports descriptors of type buffers.
-*/
-void createDescriptorSets(const VkDevice device,const std::vector<VkDescriptorSetLayoutBinding> &descSetLayoutBindings,
-    const std::vector<Buffer> &uboBuffers)
-{
-    std::vector<VkDescriptorSetLayout> layouts(VKBackend::swapchainMinImageCount, VKBackend::descriptorSetLayout);
-    VkDescriptorSetAllocateInfo allocateInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-    allocateInfo.descriptorPool = VKBackend::descriptorPool;
-    allocateInfo.descriptorSetCount = static_cast<uint32_t>(3);
-    allocateInfo.pSetLayouts = layouts.data();;
-
-    VKBackend::descriptorSets.resize(VKBackend::swapchainMinImageCount);
-
-    if (vkAllocateDescriptorSets(device, &allocateInfo, VKBackend::descriptorSets.data()) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to allocate descriptor sets!");
-    }
-
-    for (size_t i = 0; i < VKBackend::swapchainMinImageCount; i++)
-    {
-        std::vector<VkDescriptorBufferInfo> bufferInfos(descSetLayoutBindings.size());
-        std::vector<VkWriteDescriptorSet> descriptorWrites(descSetLayoutBindings.size());
-        for (size_t b = 0; b < descSetLayoutBindings.size(); b++)
-        {
-            bufferInfos.at(b) = {};
-            bufferInfos.at(b).buffer = uboBuffers.at(b).uniformBuffers.at(i);
-            bufferInfos.at(b).offset = 0;
-            bufferInfos.at(b).range = uboBuffers.at(b).range;
-
-            descriptorWrites.at(b).sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptorWrites.at(b).dstSet = VKBackend::descriptorSets[i];
-            descriptorWrites.at(b).dstBinding = descSetLayoutBindings.at(b).binding;
-            descriptorWrites.at(b).dstArrayElement = 0;
-            descriptorWrites.at(b).descriptorType = descSetLayoutBindings.at(b).descriptorType;
-            descriptorWrites.at(b).descriptorCount = descSetLayoutBindings.at(b).descriptorCount;
-            descriptorWrites.at(b).pBufferInfo = &bufferInfos.at(b);
-        }
-
-        vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
     }
 }
 void createDescriptorSets(const VkDevice device, const std::vector<Descriptor>& descriptors)
@@ -724,79 +672,6 @@ void createDescriptorSets(const VkDevice device, const std::vector<Descriptor>& 
             }
             
         }
-
-        vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
-    }
-}
-void createDescriptorSets(VkDevice device)
-{
-    std::vector<VkDescriptorSetLayout> layouts(VKBackend::swapchainMinImageCount, VKBackend::descriptorSetLayout);
-    VkDescriptorSetAllocateInfo allocateInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-    allocateInfo.descriptorPool = VKBackend::descriptorPool;
-    allocateInfo.descriptorSetCount = static_cast<uint32_t>(3);
-    allocateInfo.pSetLayouts = layouts.data();;
-
-    VKBackend::descriptorSets.resize(VKBackend::swapchainMinImageCount);
-
-    if (vkAllocateDescriptorSets(device, &allocateInfo, VKBackend::descriptorSets.data())!=VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to allocate descriptor sets!");
-    }
-
-    for (size_t i = 0; i < VKBackend::swapchainMinImageCount; i++)
-    {
-        VkDescriptorBufferInfo bufferInfo{};
-        bufferInfo.buffer = uboVert.uniformBuffers[i];
-        bufferInfo.offset = 0;
-        bufferInfo.range = sizeof(UniformBufferObject);
-
-        VkDescriptorBufferInfo bufferInfoFrag{};
-        bufferInfoFrag.buffer = uboFrag.uniformBuffers[i];
-        bufferInfoFrag.offset = 0;
-        bufferInfoFrag.range = sizeof(UBOFrag);
-
-        /*VkDescriptorImageInfo imageInfo{};
-        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        imageInfo.imageView = texture0->textureImageView;
-        imageInfo.sampler = texture0->textureSampler;
-
-        VkDescriptorImageInfo imageInfo2{};
-        imageInfo2.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        imageInfo2.imageView = texture->textureImageView;
-        imageInfo2.sampler = texture->textureSampler;*/
-
-        std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
-        descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[0].dstSet = VKBackend::descriptorSets[i];
-        descriptorWrites[0].dstBinding = 0;
-        descriptorWrites[0].dstArrayElement = 0;
-        descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptorWrites[0].descriptorCount = 1;
-        descriptorWrites[0].pBufferInfo = &bufferInfo;
-
-        descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[1].dstSet = VKBackend::descriptorSets[i];
-        descriptorWrites[1].dstBinding = 1;
-        descriptorWrites[1].dstArrayElement = 0;
-        descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptorWrites[1].descriptorCount = 1;
-        descriptorWrites[1].pBufferInfo = &bufferInfoFrag;
-
-       /* descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[1].dstSet = VKBackend::descriptorSets[i];
-        descriptorWrites[1].dstBinding = 1;
-        descriptorWrites[1].dstArrayElement = 0;
-        descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        descriptorWrites[1].descriptorCount = 1;
-        descriptorWrites[1].pImageInfo = &imageInfo;
-
-        descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[2].dstSet = VKBackend::descriptorSets[i];
-        descriptorWrites[2].dstBinding = 2;
-        descriptorWrites[2].dstArrayElement = 0;
-        descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        descriptorWrites[2].descriptorCount = 1;
-        descriptorWrites[2].pImageInfo = &imageInfo2;*/
 
         vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
     }
