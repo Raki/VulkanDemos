@@ -1,8 +1,8 @@
 [
     {
-        "shaders/solidShapes3D.vert.glsl": "133227286433826614"
+        "shaders/simpleMat.vert.glsl": "133228865195576106"
     },
     {
-        "shaders/solidShapes3D.frag.glsl": "133227286501533028"
+        "shaders/simpleMat.frag.glsl": "133228926649825226"
     }
 ]

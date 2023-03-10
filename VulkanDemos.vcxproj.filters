@@ -36,7 +36,7 @@
     <ClCompile Include="utils\spirv_reflect.cpp">
       <Filter>utils</Filter>
     </ClCompile>
-    <ClCompile Include="Example9.cpp">
+    <ClCompile Include="Example10.cpp">
       <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>
@@ -107,6 +107,12 @@
       <Filter>shaders</Filter>
     </None>
     <None Include="shaders\solidShapes3D.vert.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\simpleMat.frag.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\simpleMat.vert.glsl">
       <Filter>shaders</Filter>
     </None>
   </ItemGroup>

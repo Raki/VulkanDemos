@@ -19,6 +19,7 @@ layout(location =1) in vec3 normal;
 layout(location =0)out vec3 normal_out;
 layout(location =1)out vec3 fraPos_out;
 
+
 void main()
 {
 	normal_out = normalize(mat3(ubo.nrmlMat)*normal);

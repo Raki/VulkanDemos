@@ -10,8 +10,6 @@ layout (binding=1) uniform LightInfo
 	vec4 color;
 }lInfo;
 
-//vec3 lightPos = vec3(0,20,0);
-//vec3 color = vec3(0.5,0.5,1.0);
 
 float getDiffuseFactr()
 {
