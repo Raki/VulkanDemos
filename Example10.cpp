@@ -159,15 +159,28 @@ struct Buffer
     VkDeviceSize range=0;
     std::vector<VkDescriptorBufferInfo> bufferInfo;
     bool isDirtry = true;
+    Buffer()
+    {
+
+    }
+    Buffer(const Buffer& buff)
+    {
+        uniformBuffers.clear();
+        uniformBuffers.insert(uniformBuffers.begin(), buff.uniformBuffers.begin(), buff.uniformBuffers.end());
+        uniformBufferMemories.clear();
+        uniformBufferMemories.insert(uniformBufferMemories.begin(), buff.uniformBufferMemories.begin(), buff.uniformBufferMemories.end());
+        bufferInfo.clear();
+        bufferInfo.insert(bufferInfo.begin(), buff.bufferInfo.begin(), buff.bufferInfo.end());
+        range = buff.range;
+        isDirtry = buff.isDirtry;
+    }
+
 };
 
 struct Image
 {
-    VkImage image;
-    VkImageView imageView;
-    VkDeviceMemory imageMemory;
-    VkSampler textureSampler;
-    std::vector<VkDescriptorImageInfo> imageInfo;
+    std::shared_ptr<VKBackend::VKTexture> texContainer;
+    VkDescriptorImageInfo imageInfo;
 };
 
 struct Descriptor
@@ -192,6 +205,8 @@ VkImageView depthImageView;
 std::shared_ptr<VKBackend::VKRenderTarget> msColorAttch;
 std::vector<std::shared_ptr<VKMesh>> cubes;
 std::chrono::system_clock::time_point lastTime{};
+
+std::shared_ptr<VKBackend::VKTexture> texture;
 
 struct FiveColors
 {
@@ -221,7 +236,7 @@ VkSurfaceKHR createSurface(GLFWwindow* window, VkInstance instace);
 void createUniformBuffers();
 void createDescriptorSets(VkDevice device);
 void createDescriptorSets(const VkDevice device, const std::vector<VkDescriptorSetLayoutBinding>& descSetLayoutBindings, const std::vector<Buffer>& uboBuffers);
-void createDescriptorSets(const VkDevice device, const std::vector<VkDescriptorSetLayoutBinding>& descSetLayoutBindings, const std::vector<Descriptor>& descriptors);
+void createDescriptorSets(const VkDevice device, const std::vector<Descriptor>& descriptors);
 VkPipeline createGraphicsPipeline(VkDevice device, VkRenderPass renderPass, VkShaderModule vsModule, VkShaderModule fsModule);
 void createFramebuffers();
 void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
@@ -301,8 +316,8 @@ void initVulkan()
     VKBackend::renderPass = VKBackend::createRenerPass(VKBackend::device);
 
 
-    auto vsFileContent = Utility::readBinaryFileContents("shaders/solidShapes3D.vert.spv");
-    auto fsFileContent = Utility::readBinaryFileContents("shaders/solidShapes3D.frag.spv");
+    auto vsFileContent = Utility::readBinaryFileContents("shaders/simpleMat.vert.spv");
+    auto fsFileContent = Utility::readBinaryFileContents("shaders/simpleMat.frag.spv");
 
     auto triangleVS = VKBackend::loadShader(VKBackend::device, vsFileContent);
     assert(triangleVS);
@@ -342,9 +357,44 @@ void initVulkan()
     }
 
     VKBackend::createDescriptorPool(VKBackend::device,poolsizes);
-    //createDescriptorSets(VKBackend::device);
-    std::vector<Buffer> ubos = {uboVert,uboFrag};
-    createDescriptorSets(VKBackend::device,layoutBindings,ubos);
+
+    std::vector<Descriptor> descriptors;
+    
+    texture = VKBackend::createVKTexture("img/sample.jpg");
+    auto image = std::make_shared<Image>();
+    image->texContainer = texture;
+    VkDescriptorImageInfo imageInfo{};
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    imageInfo.imageView = texture->textureImageView;
+    imageInfo.sampler = texture->textureSampler;
+    image->imageInfo = imageInfo;
+    
+    for (size_t l=0;l<layoutBindings.size();l++)
+    {
+        auto lb = layoutBindings.at(l);
+        Descriptor descriptor;
+        switch (lb.binding)
+        {
+            case 0: // v shader ubo
+                descriptor.buffer = std::make_shared<Buffer>(uboVert);
+                descriptor.layout = lb;
+                break;
+            case 1: // f shader ubo
+                descriptor.buffer = std::make_shared<Buffer>(uboFrag);
+                descriptor.layout = lb;
+                break;
+            case 2: // f shader sampler
+                descriptor.image = image;
+                descriptor.layout = lb;
+                break;
+            default:
+                assert(false);
+        }
+
+        descriptors.push_back(descriptor);
+    }
+
+    createDescriptorSets(VKBackend::device,descriptors);
 
     VKBackend::graphicsPipeline = createGraphicsPipeline(VKBackend::device, VKBackend::renderPass, triangleVS, triangleFS);
 
@@ -372,6 +422,9 @@ void updateFrame()
 }
 void compileShaders()
 {
+    //ToDo: 
+    //1. Solve the bug when no existing spv files are there
+    //2. Make this work for any set of shaders with keeping the old ones intact
     std::filesystem::path spvState("spvState.json");
     if (std::filesystem::exists(spvState))
     {
@@ -432,8 +485,8 @@ void compileShaders()
 
         rapidjson::Document::AllocatorType& allocator = doc.GetAllocator();
 
-        std::filesystem::path fs("shaders/solidShapes3D.frag.glsl");
-        std::filesystem::path vs("shaders/solidShapes3D.vert.glsl");
+        std::filesystem::path fs("shaders/simpleMat.frag.glsl");
+        std::filesystem::path vs("shaders/simpleMat.vert.glsl");
 
         std::vector<std::filesystem::path> paths = {vs,fs};
 
@@ -560,18 +613,26 @@ void createUniformBuffers()
     uboFrag.range = sizeof(UBOFrag);
     uboFrag.uniformBuffers.resize(VKBackend::swapchainMinImageCount);
     uboFrag.uniformBufferMemories.resize(VKBackend::swapchainMinImageCount);
+    uboFrag.bufferInfo.resize(VKBackend::swapchainMinImageCount);
     
     uboVert.range = sizeof(UniformBufferObject);
     uboVert.uniformBuffers.resize(VKBackend::swapchainMinImageCount);
     uboVert.uniformBufferMemories.resize(VKBackend::swapchainMinImageCount);
+    uboVert.bufferInfo.resize(VKBackend::swapchainMinImageCount);
 
     for (size_t i = 0; i < VKBackend::swapchainMinImageCount; i++)
     {
        VkDeviceSize bufferSize = sizeof(UniformBufferObject);
        VKBackend::createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uboVert.uniformBuffers.at(i), uboVert.uniformBufferMemories.at(i));
+       uboVert.bufferInfo.at(i).buffer = uboVert.uniformBuffers.at(i);
+       uboVert.bufferInfo.at(i).offset = 0;
+       uboVert.bufferInfo.at(i).range = uboVert.range;
 
        bufferSize = sizeof(UBOFrag);
        VKBackend::createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uboFrag.uniformBuffers.at(i), uboFrag.uniformBufferMemories.at(i));
+       uboFrag.bufferInfo.at(i).buffer = uboFrag.uniformBuffers.at(i);
+       uboFrag.bufferInfo.at(i).offset = 0;
+       uboFrag.bufferInfo.at(i).range = uboFrag.range;
     }
 }
 
@@ -653,14 +714,10 @@ void createDescriptorSets(const VkDevice device, const std::vector<Descriptor>& 
             }
             else if (descriptors.at(d).layout.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
             {
-                descriptors.at(d).image->imageInfo.at(d).imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                descriptors.at(d).image->imageInfo.at(d).imageView = descriptors.at(d).image->imageView;// texture0->textureImageView;
-                descriptors.at(d).image->imageInfo.at(d).sampler = descriptors.at(d).image->textureSampler;
-                descriptorWrites.at(d).pImageInfo = &descriptors.at(d).image->imageInfo.at(i);
+                descriptorWrites.at(d).pImageInfo = &descriptors.at(d).image->imageInfo;
             }
             
         }
-
 
         vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
     }
@@ -904,7 +961,7 @@ void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex)
         vkCmdBindIndexBuffer(commandBuffer, shape->indexBuffer, 0, VK_INDEX_TYPE_UINT16);
         vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, VKBackend::pipelineLayout, 0, 1, &VKBackend::descriptorSets[imageIndex], 0, nullptr);
         vkCmdPushConstants(commandBuffer, VKBackend::pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant), &pConstant);
-        vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(shape->indices.size()), 1, 0, 0, 0);
+        vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(shape->meshData->iData.size()), 1, 0, 0, 0);
     }
 
     vkCmdEndRenderPass(commandBuffer);
