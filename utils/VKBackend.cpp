@@ -930,10 +930,10 @@ namespace VKBackend
 		VkPipelineLayout pLayout;
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		pipelineLayoutInfo.setLayoutCount = setLayouts.size();
-		pipelineLayoutInfo.pSetLayouts = setLayouts.data();// &VKBackend::descriptorSetLayout;
-		pipelineLayoutInfo.pPushConstantRanges = pushConstants.data();// &pushConstant;
-		pipelineLayoutInfo.pushConstantRangeCount = pushConstants.size();
+		pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(setLayouts.size());
+		pipelineLayoutInfo.pSetLayouts = setLayouts.data();
+		pipelineLayoutInfo.pPushConstantRanges = pushConstants.data();;
+		pipelineLayoutInfo.pushConstantRangeCount = static_cast<uint32_t>(pushConstants.size());
 
 		if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pLayout) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create pipeline layout!");

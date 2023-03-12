@@ -48,7 +48,8 @@ namespace Color
 			ss >> r;
 			if (ss.fail())
 				return false;
-			rgb[i/2]=r / 255.f;
+			glm::vec3::length_type ind = static_cast<glm::vec3::length_type>(i / 2);
+			rgb[ind]=r / 255.f;
 			ss.clear();
 		}
 
