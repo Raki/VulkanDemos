@@ -1188,10 +1188,23 @@ void loadGlbModel(std::string filePath)
     {
         assert((scene.nodes[i] >= 0) && (scene.nodes[i] < model.nodes.size()));
         
-        auto node = model.nodes[scene.nodes[i]];
+        auto &node = model.nodes[scene.nodes[i]];
 
         if ((node.mesh >= 0) && (node.mesh < model.meshes.size())) {
             //bindMesh(vbos, model, model.meshes[node.mesh]);
+            auto& mesh = model.meshes[node.mesh];
+            if (mesh.primitives.size() > 0)
+            {
+                auto& primitive = mesh.primitives.at(0);
+                auto& posAccrInd = primitive.attributes["POSITION"];
+                auto& nrmAccrInd = primitive.attributes["NORMAL"];
+                auto& uvAccrInd = primitive.attributes["TEXCOORD_0"];
+
+                auto& posAccr = model.accessors.at(posAccrInd);
+                auto& posBuffView = model.bufferViews.at(posAccr.bufferView);
+                auto& posBuff = model.buffers.at(posBuffView.buffer);
+                //posBuff.data
+            }
         }
     }
 }
