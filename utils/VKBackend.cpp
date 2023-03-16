@@ -555,6 +555,27 @@ namespace VKBackend
 		return setLayouts;
 	}
 
+	void getInputInfoFromSpv(const std::vector<unsigned char>& fileContent, std::vector<VkVertexInputAttributeDescription>& vertIPAttribDesc, VkVertexInputBindingDescription& vertIPBindDesc)
+	{
+		assert(fileContent.size() != 0);
+
+		SpvReflectShaderModule module = {};
+		auto result = spvReflectCreateShaderModule(fileContent.size(), fileContent.data(), &module);
+		assert(result == SPV_REFLECT_RESULT_SUCCESS);
+
+		if (module.shader_stage != SPV_REFLECT_SHADER_STAGE_VERTEX_BIT)
+			return;
+
+		uint32_t count = 0;
+		result = spvReflectEnumerateInputVariables(&module, &count, NULL);
+		assert(result == SPV_REFLECT_RESULT_SUCCESS);
+
+		std::vector<SpvReflectInterfaceVariable*> input_vars(count);
+		result =
+			spvReflectEnumerateInputVariables(&module, &count, input_vars.data());
+		assert(result == SPV_REFLECT_RESULT_SUCCESS);
+	}
+
 	void createDescriptorSetLayout(std::vector <VkDescriptorSetLayoutBinding> layoutBindings)
 	{
 		VkDescriptorSetLayoutCreateInfo createInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
