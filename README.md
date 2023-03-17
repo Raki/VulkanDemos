@@ -49,3 +49,7 @@ Simple clock. This demo uses push constants for per object transformations
   Trivial logic to re-compile shaders to spirv at the time of project build, when changes were saved.
 
   Deletion of vulkan resources based on descriptors created.(UBOs & Images supported for now) 
+
+* Example 11
+
+  PipelineVertexInputState creation using spirv reflection
