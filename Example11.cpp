@@ -248,6 +248,9 @@ VkSurfaceKHR createSurface(GLFWwindow* window, VkInstance instace);
 void createUniformBuffers();
 void createDescriptorSets(const VkDevice device, const std::vector<Descriptor>& descriptors);
 VkPipeline createGraphicsPipeline(VkDevice device, VkRenderPass renderPass, VkShaderModule vsModule, VkShaderModule fsModule);
+//ToDo: Any chance to improve this?
+VkPipeline createGraphicsPipeline(VkDevice device, VkRenderPass renderPass, VkShaderModule vsModule, VkShaderModule fsModule,
+    std::vector<VkVertexInputAttributeDescription>& vertIPAttribDesc, VkVertexInputBindingDescription vertIPBindDesc);
 void createFramebuffers();
 void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
@@ -338,6 +341,10 @@ void initVulkan()
     auto setsV = VKBackend::getDescriptorSetLayoutDataFromSpv(vsFileContent);
     auto setsF = VKBackend::getDescriptorSetLayoutDataFromSpv(fsFileContent);
 
+    std::vector<VkVertexInputAttributeDescription> vertIPAttribDesc;
+    VkVertexInputBindingDescription vertIPBindDesc;
+    VKBackend::getInputInfoFromSpv(vsFileContent, vertIPAttribDesc, vertIPBindDesc);
+
     std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
 
     for (const auto& set : setsV)
@@ -405,7 +412,8 @@ void initVulkan()
 
     createDescriptorSets(VKBackend::device,descriptors);
 
-    VKBackend::graphicsPipeline = createGraphicsPipeline(VKBackend::device, VKBackend::renderPass, triangleVS, triangleFS);
+    VKBackend::graphicsPipeline = createGraphicsPipeline(VKBackend::device, VKBackend::renderPass, triangleVS, triangleFS,
+        vertIPAttribDesc,vertIPBindDesc);
 
     vkDestroyShaderModule(VKBackend::device, triangleVS, nullptr);
     vkDestroyShaderModule(VKBackend::device, triangleFS, nullptr);
@@ -717,6 +725,65 @@ VkPipeline createGraphicsPipeline(VkDevice device, VkRenderPass renderPass, VkSh
     pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
     std::vector<VkPushConstantRange> pushConstants = {pushConstant};
+    std::vector<VkDescriptorSetLayout> descriptorLayouts = { VKBackend::descriptorSetLayout };
+
+    VKBackend::pipelineLayout = VKBackend::createPipelineLayout(descriptorLayouts, pushConstants);
+
+    VkPipeline graphicsPipeline;
+    VkGraphicsPipelineCreateInfo pipelineInfo{};
+    pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineInfo.stageCount = 2;
+    pipelineInfo.pStages = stages;
+    pipelineInfo.pVertexInputState = &vertexInputInfo;
+    pipelineInfo.pInputAssemblyState = &inputAssembly;
+    pipelineInfo.pViewportState = &viewportState;
+    pipelineInfo.pRasterizationState = &rasterizer;
+    pipelineInfo.pMultisampleState = &multisampling;
+    pipelineInfo.pColorBlendState = &colorBlending;
+    pipelineInfo.pDynamicState = &dynamicState;
+    pipelineInfo.pDepthStencilState = &depthStencil;
+    pipelineInfo.layout = VKBackend::pipelineLayout;
+    pipelineInfo.renderPass = renderPass;
+    pipelineInfo.subpass = 0;
+    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+
+    if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create graphics pipeline!");
+    }
+
+    return graphicsPipeline;
+}
+VkPipeline createGraphicsPipeline(VkDevice device, VkRenderPass renderPass, VkShaderModule vsModule, VkShaderModule fsModule,
+    std::vector<VkVertexInputAttributeDescription>& vertIPAttribDesc, VkVertexInputBindingDescription vertIPBindDesc)
+{
+    VkPipelineShaderStageCreateInfo stages[2] = {};
+    stages[0] = VKBackend::getPipelineShaderStage(VK_SHADER_STAGE_VERTEX_BIT, vsModule);
+    stages[1] = VKBackend::getPipelineShaderStage(VK_SHADER_STAGE_FRAGMENT_BIT, fsModule);
+
+    auto vertexInputInfo = VKBackend::getPipelineVertexInputState(1, &vertIPBindDesc, static_cast<uint32_t>(vertIPAttribDesc.size()),
+        vertIPAttribDesc.data());
+    auto inputAssembly = VKBackend::getPipelineInputAssemblyState(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_FALSE);
+    auto viewportState = VKBackend::getPipelineViewportState(1, 1);
+    auto rasterizer = VKBackend::getPipelineRasterState(VK_POLYGON_MODE_FILL, 1.0f);
+    auto multisampling = VKBackend::getPipelineMultisampleState(VK_FALSE, VKBackend::msaaSamples);
+    auto depthStencil = VKBackend::getPipelineDepthStencilState(VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS, VK_FALSE, 0.0f, 1.0f, VK_FALSE);
+
+    VkPipelineColorBlendAttachmentState colorBlendAttachment = VKBackend::getPipelineColorBlendAttachState(VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT, VK_FALSE);
+    const float blendConsts[4] = { 0,0,0,0 };
+    auto colorBlending = VKBackend::getPipelineColorBlendState(VK_FALSE, VK_LOGIC_OP_COPY, 1, &colorBlendAttachment, blendConsts);
+
+    std::vector<VkDynamicState> dynamicStates = {
+        VK_DYNAMIC_STATE_VIEWPORT,
+        VK_DYNAMIC_STATE_SCISSOR
+    };
+    auto dynamicState = VKBackend::getPipelineDynamicState(dynamicStates);
+
+    VkPushConstantRange pushConstant;
+    pushConstant.offset = 0;
+    pushConstant.size = sizeof(PushConstant);
+    pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+    std::vector<VkPushConstantRange> pushConstants = { pushConstant };
     std::vector<VkDescriptorSetLayout> descriptorLayouts = { VKBackend::descriptorSetLayout };
 
     VKBackend::pipelineLayout = VKBackend::createPipelineLayout(descriptorLayouts, pushConstants);
@@ -1143,7 +1210,7 @@ void setupScene()
     shapes.push_back(cube);*/
     
     setupCubes();
-    loadGlbModel("models/Avocado.glb");
+    //loadGlbModel("models/Avocado.glb");
 
     lightInfo.position = glm::vec4(0, 20, 0, 0);
     lightInfo.color = glm::vec4(0.5, 0.5, 1.f, 1.0f);
@@ -1211,7 +1278,7 @@ void loadGlbModel(std::string filePath)
 #pragma endregion functions
 
 /*
-* Add support for gltf model rendering
+* Add support for gltf model rendering10
 */
 
 int main()
