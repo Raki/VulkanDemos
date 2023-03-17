@@ -938,7 +938,8 @@ namespace VKBackend
 		return result;
 	}
 
-	void getInputInfoFromSpv(const std::vector<unsigned char>& fileContent, std::vector<VkVertexInputAttributeDescription>& vertIPAttribDesc, VkVertexInputBindingDescription& vertIPBindDesc)
+	void getInputInfoFromSpv(const std::vector<unsigned char>& fileContent, std::vector<VkVertexInputAttributeDescription>& vertIPAttribDesc, 
+		std::vector<VkVertexInputBindingDescription>& vertIPBindDesc, bool interleaved)
 	{
 		assert(fileContent.size() != 0);
 
@@ -958,10 +959,10 @@ namespace VKBackend
 			spvReflectEnumerateInputVariables(&module, &count, input_vars.data());
 		assert(result == SPV_REFLECT_RESULT_SUCCESS);
 
-		vertIPBindDesc = {};
-		vertIPBindDesc.binding = 0;
-		vertIPBindDesc.stride = 0;  // computed below
-		vertIPBindDesc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+		VkVertexInputBindingDescription vIPBindDesc = {};
+		vIPBindDesc.binding = 0;
+		vIPBindDesc.stride = 0;  // computed below
+		vIPBindDesc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
 		VkPipelineVertexInputStateCreateInfo vertex_input_state_create_info = {
 		VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
@@ -978,7 +979,7 @@ namespace VKBackend
 			}
 			VkVertexInputAttributeDescription attr_desc{};
 			attr_desc.location = refl_var.location;
-			attr_desc.binding = vertIPBindDesc.binding;
+			attr_desc.binding = vIPBindDesc.binding;
 			attr_desc.format = static_cast<VkFormat>(refl_var.format);
 			attr_desc.offset = 0;  // final offset computed below after sorting.
 			vertIPAttribDesc.push_back(attr_desc);
@@ -992,10 +993,29 @@ namespace VKBackend
 					return a.location < b.location;
 			});
 		// Compute final offsets of each attribute, and total vertex stride.
-		for (auto& attribute : vertIPAttribDesc) {
-			uint32_t format_size = formatSize(attribute.format);
-			attribute.offset = vertIPBindDesc.stride;
-			vertIPBindDesc.stride += format_size;
+		if (interleaved)
+		{
+			for (auto& attribute : vertIPAttribDesc) {
+				uint32_t format_size = formatSize(attribute.format);
+				attribute.offset = vIPBindDesc.stride;
+				vIPBindDesc.stride += format_size;
+			}
+			vertIPBindDesc.push_back(vIPBindDesc);
+		}
+		else
+		{
+			for (auto& attribute : vertIPAttribDesc) {
+				uint32_t format_size = formatSize(attribute.format);
+				attribute.offset = vIPBindDesc.stride;
+				VkVertexInputBindingDescription ipBindDesc = {};
+				ipBindDesc.binding = attribute.location;
+				ipBindDesc.stride = format_size; 
+				ipBindDesc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+				attribute.binding = ipBindDesc.binding;
+				attribute.offset = 0;
+				vertIPBindDesc.push_back(ipBindDesc);
+			}
 		}
 	}
 

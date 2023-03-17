@@ -250,7 +250,8 @@ void createDescriptorSets(const VkDevice device, const std::vector<Descriptor>& 
 VkPipeline createGraphicsPipeline(VkDevice device, VkRenderPass renderPass, VkShaderModule vsModule, VkShaderModule fsModule);
 //ToDo: Any chance to improve this?
 VkPipeline createGraphicsPipeline(VkDevice device, VkRenderPass renderPass, VkShaderModule vsModule, VkShaderModule fsModule,
-    std::vector<VkVertexInputAttributeDescription>& vertIPAttribDesc, VkVertexInputBindingDescription vertIPBindDesc);
+    std::vector<VkVertexInputAttributeDescription>& vertIPAttribDesc, 
+    std::vector<VkVertexInputBindingDescription>& vertIPBindDesc);
 void createFramebuffers();
 void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
@@ -342,7 +343,7 @@ void initVulkan()
     auto setsF = VKBackend::getDescriptorSetLayoutDataFromSpv(fsFileContent);
 
     std::vector<VkVertexInputAttributeDescription> vertIPAttribDesc;
-    VkVertexInputBindingDescription vertIPBindDesc;
+    std::vector<VkVertexInputBindingDescription> vertIPBindDesc;
     VKBackend::getInputInfoFromSpv(vsFileContent, vertIPAttribDesc, vertIPBindDesc);
 
     std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
@@ -754,13 +755,14 @@ VkPipeline createGraphicsPipeline(VkDevice device, VkRenderPass renderPass, VkSh
     return graphicsPipeline;
 }
 VkPipeline createGraphicsPipeline(VkDevice device, VkRenderPass renderPass, VkShaderModule vsModule, VkShaderModule fsModule,
-    std::vector<VkVertexInputAttributeDescription>& vertIPAttribDesc, VkVertexInputBindingDescription vertIPBindDesc)
+    std::vector<VkVertexInputAttributeDescription>& vertIPAttribDesc, 
+    std::vector<VkVertexInputBindingDescription>& vertIPBindDesc)
 {
     VkPipelineShaderStageCreateInfo stages[2] = {};
     stages[0] = VKBackend::getPipelineShaderStage(VK_SHADER_STAGE_VERTEX_BIT, vsModule);
     stages[1] = VKBackend::getPipelineShaderStage(VK_SHADER_STAGE_FRAGMENT_BIT, fsModule);
 
-    auto vertexInputInfo = VKBackend::getPipelineVertexInputState(1, &vertIPBindDesc, static_cast<uint32_t>(vertIPAttribDesc.size()),
+    auto vertexInputInfo = VKBackend::getPipelineVertexInputState(static_cast<uint32_t>(vertIPBindDesc.size()), vertIPBindDesc.data(), static_cast<uint32_t>(vertIPAttribDesc.size()),
         vertIPAttribDesc.data());
     auto inputAssembly = VKBackend::getPipelineInputAssemblyState(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_FALSE);
     auto viewportState = VKBackend::getPipelineViewportState(1, 1);

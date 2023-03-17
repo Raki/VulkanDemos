@@ -100,7 +100,7 @@ namespace VKBackend
 	std::vector<DescriptorSetLayoutData> getDescriptorSetLayoutDataFromSpv(const std::vector<unsigned char> &fileContent);
 	uint32_t formatSize(VkFormat format);
 	void getInputInfoFromSpv(const std::vector<unsigned char>& fileContent, std::vector<VkVertexInputAttributeDescription> &vertIPAttribDesc,
-		VkVertexInputBindingDescription &vertIPBindDesc);
+		std::vector<VkVertexInputBindingDescription> &vertIPBindDesc,bool interleaved=true);
 	void createDescriptorSetLayout(std::vector <VkDescriptorSetLayoutBinding> layoutBindings);
 	void createDescriptorPool(VkDevice device, std::vector<VkDescriptorPoolSize> poolsizes);
 
