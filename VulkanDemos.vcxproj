@@ -19,7 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Example9.cpp" />
+    <ClCompile Include="Example11.cpp" />
     <ClCompile Include="imgui\imgui_impl_glfw.cpp" />
     <ClCompile Include="imgui\imgui_impl_vulkan.cpp" />
     <ClCompile Include="utils\Colors.cpp" />
@@ -46,6 +46,8 @@
     <None Include="shaders\diffuseTex.frag.glsl" />
     <None Include="shaders\diffuseTex.vert.glsl" />
     <None Include="shaders\fLights.glsl" />
+    <None Include="shaders\simpleMat.frag.glsl" />
+    <None Include="shaders\simpleMat.vert.glsl" />
     <None Include="shaders\solidShapes.frag.glsl" />
     <None Include="shaders\solidShapes.vert.glsl" />
     <None Include="shaders\solidShapes3D.frag.glsl" />

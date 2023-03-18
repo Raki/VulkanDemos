@@ -54,8 +54,19 @@ struct VKMesh
     glm::mat4 rMatrix=glm::mat4(1);
     glm::mat4 tMatrix=glm::mat4(1);
     float th = 0;
+    bool isInterleaved = true;
     VkBuffer vertexBuffer;
     VkDeviceMemory vertexBufferMemory;
+
+    VkBuffer posBuffer;
+    VkDeviceMemory posBufferMemory;
+
+    VkBuffer normBuffer;
+    VkDeviceMemory normBufferMemory;
+
+    VkBuffer uvBuffer;
+    VkDeviceMemory uvBufferMemory;
+
     VkBuffer indexBuffer;
     VkDeviceMemory indexBufferMemory;
     
@@ -105,6 +116,158 @@ struct VKMesh
 
         vkDestroyBuffer(device, iStageBuff, nullptr);
         vkFreeMemory(device, iStageBuffMemory, nullptr);
+    }
+    void createBuffNonInterleaved(const VkDevice& device)
+    {
+        isInterleaved = false;
+
+        std::vector<glm::vec3> posArr;
+        std::vector<glm::vec3> normArr;
+        std::vector<glm::vec2> uvArr;
+
+        for (auto &vert : meshData->vData)
+        {
+            posArr.push_back(vert.position);
+            normArr.push_back(vert.normal);
+            uvArr.push_back(vert.uv);
+        }
+
+        enum class CType {POS,NORM,UV,INDEX};
+
+        struct Container
+        {
+            VkDeviceSize buffSize;
+            void* data;
+            CType type;
+        };
+
+        std::vector<Container> cInfos;
+        Container vCont;
+        vCont.buffSize = sizeof(glm::vec3)*posArr.size();
+        vCont.data = posArr.data();
+        vCont.type = CType::POS;
+        cInfos.push_back(vCont);
+
+        Container nCont;
+        nCont.buffSize = sizeof(glm::vec3) * normArr.size();
+        nCont.data = normArr.data();
+        nCont.type = CType::NORM;
+        cInfos.push_back(nCont);
+
+        Container uvCont;
+        uvCont.buffSize = sizeof(glm::vec2) * uvArr.size();
+        uvCont.data = uvArr.data();
+        uvCont.type = CType::UV;
+        cInfos.push_back(uvCont);
+
+        Container iCont;
+        iCont.buffSize = sizeof(uint16_t) * meshData->iData.size();
+        iCont.data = meshData->iData.data();
+        iCont.type = CType::INDEX;
+        cInfos.push_back(iCont);
+
+        for (auto& container : cInfos)
+        {
+            VkBuffer stageBuff;
+            VkDeviceMemory stageBuffMemory;
+
+            VKBackend::createBuffer(container.buffSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stageBuff, stageBuffMemory);
+            void* data;
+            vkMapMemory(device, stageBuffMemory, 0, container.buffSize, 0, &data);
+            memcpy(data, posArr.data(), (size_t)container.buffSize);
+            vkUnmapMemory(device, stageBuffMemory);
+
+            switch (container.type)
+            {
+            case CType::POS:
+                VKBackend::createBuffer(container.buffSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, posBuffer, posBufferMemory);
+                break;
+            case CType::NORM:
+                VKBackend::createBuffer(container.buffSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, normBuffer, normBufferMemory);
+                break;
+            case CType::UV:
+                VKBackend::createBuffer(container.buffSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, uvBuffer, uvBufferMemory);
+                break;
+            case CType::INDEX:
+                VKBackend::createBuffer(container.buffSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
+                break;
+            default:
+                break;
+            }
+
+            VkCommandBuffer commandBuffer = VKBackend::beginSingleTimeCommands();
+
+            VkBufferCopy copyRegion{}, copyRegionIndex{};
+            copyRegion.size = container.buffSize;
+
+            switch (container.type)
+            {
+            case CType::POS:
+                vkCmdCopyBuffer(commandBuffer, stageBuff, posBuffer, 1, &copyRegion);
+                break;
+            case CType::NORM:
+                vkCmdCopyBuffer(commandBuffer, stageBuff, normBuffer, 1, &copyRegion);
+                break;
+            case CType::UV:
+                vkCmdCopyBuffer(commandBuffer, stageBuff, uvBuffer, 1, &copyRegion);
+                break;
+            case CType::INDEX:
+                vkCmdCopyBuffer(commandBuffer, stageBuff, indexBuffer, 1, &copyRegion);
+                break;
+            default:
+                break;
+            }
+            
+
+            VKBackend::endSingleTimeCommands(commandBuffer);
+
+            vkDestroyBuffer(device, stageBuff, nullptr);
+            vkFreeMemory(device, stageBuffMemory, nullptr);
+        }
+        
+
+        ////size of buffers
+        //VkDeviceSize vBuffSize = sizeof(VKUtility::Vertex) * meshData->vData.size();
+        //VkDeviceSize iBuffSize = sizeof(uint16_t) * meshData->iData.size();
+
+        ////staging buffer
+        //VkBuffer vStageBuff, iStageBuff;
+        //VkDeviceMemory vStageBuffMemory, iStageBuffMemory;
+
+        //VKBackend::createBuffer(vBuffSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, vStageBuff, vStageBuffMemory);
+        //void* data;
+        //vkMapMemory(device, vStageBuffMemory, 0, vBuffSize, 0, &data);
+        //memcpy(data, meshData->vData.data(), (size_t)vBuffSize);
+        //vkUnmapMemory(device, vStageBuffMemory);
+
+        //VKBackend::createBuffer(iBuffSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, iStageBuff, iStageBuffMemory);
+        //void* iData;
+        //vkMapMemory(device, iStageBuffMemory, 0, iBuffSize, 0, &iData);
+        //memcpy(iData, meshData->iData.data(), (size_t)iBuffSize);
+        //vkUnmapMemory(device, iStageBuffMemory);
+
+        ////create device memory backed buffer
+        //VKBackend::createBuffer(vBuffSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
+        //VKBackend::createBuffer(iBuffSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
+
+        ////transfer memory from staging to device memory backed buffer
+
+        //VkCommandBuffer commandBuffer = VKBackend::beginSingleTimeCommands();
+
+        //VkBufferCopy copyRegion{}, copyRegionIndex{};
+        //copyRegion.size = vBuffSize;
+        //copyRegionIndex.size = iBuffSize;
+
+        //vkCmdCopyBuffer(commandBuffer, vStageBuff, vertexBuffer, 1, &copyRegion);
+        //vkCmdCopyBuffer(commandBuffer, iStageBuff, indexBuffer, 1, &copyRegionIndex);
+
+        //VKBackend::endSingleTimeCommands(commandBuffer);
+
+        //vkDestroyBuffer(device, vStageBuff, nullptr);
+        //vkFreeMemory(device, vStageBuffMemory, nullptr);
+
+        //vkDestroyBuffer(device, iStageBuff, nullptr);
+        //vkFreeMemory(device, iStageBuffMemory, nullptr);
     }
 };
 
@@ -905,13 +1068,32 @@ void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex)
     for (const auto& shape : cubes)
     {
         //std::shared_ptr<VKMesh3D> shape = cube;
-        VkBuffer vertexBuffers[] = { shape->vertexBuffer };
-        VkDeviceSize offsets[] = { 0 };
+
+        std::vector<VkBuffer> vertexBuffers;// [] = { shape->vertexBuffer };
+        std::vector<VkDeviceSize> offsets;
+        if (shape->isInterleaved)
+        {
+            vertexBuffers.push_back(shape->vertexBuffer);
+            offsets.push_back(0);
+        }
+        else
+        {
+            vertexBuffers.push_back(shape->posBuffer);
+            vertexBuffers.push_back(shape->normBuffer);
+            vertexBuffers.push_back(shape->uvBuffer);
+            offsets.push_back(0);
+            offsets.push_back(0);
+            offsets.push_back(0);
+        }
+        
 
         PushConstant pConstant;
         pConstant.tMat = shape->rMatrix*shape->tMatrix;
-
-        vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+        //https://www.reddit.com/r/vulkan/comments/hszobo/noob_question_utilizing_multiple_vkbuffers_and/
+        //https://gist.github.com/SaschaWillems/428d15ed4b5d71ead462bc63adffa93a
+        vkCmdBindVertexBuffers(commandBuffer, 0, static_cast<uint32_t>(vertexBuffers.size()), vertexBuffers.data(), &offsets.at(0));
+        
+        
         vkCmdBindIndexBuffer(commandBuffer, shape->indexBuffer, 0, VK_INDEX_TYPE_UINT16);
         vkCmdPushConstants(commandBuffer, VKBackend::pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant), &pConstant);
         vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(shape->meshData->iData.size()), 1, 0, 0, 0);
@@ -1224,6 +1406,7 @@ void setupCubes()
     auto cube = std::make_shared<VKMesh>();
     cube->meshData = cubeMesh;
     cube->createBuffers(VKBackend::device);
+    //cube->createBuffNonInterleaved(VKBackend::device);
     cube->tMatrix = glm::mat4(1);
 
     cubes.push_back(cube);
