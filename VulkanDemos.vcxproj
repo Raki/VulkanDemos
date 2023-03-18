@@ -19,7 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Example11.cpp" />
+    <ClCompile Include="Example12.cpp" />
     <ClCompile Include="imgui\imgui_impl_glfw.cpp" />
     <ClCompile Include="imgui\imgui_impl_vulkan.cpp" />
     <ClCompile Include="utils\Colors.cpp" />

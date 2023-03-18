@@ -33,6 +33,7 @@ vec3 getAmbientColor()
 	return vec3(0.2);
 }
 
+
 void main()
 {
     outColor = vec4(getDiffuseColrVertex()+getAmbientColor(),1.0);
