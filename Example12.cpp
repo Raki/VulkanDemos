@@ -132,74 +132,106 @@ struct VKMesh
             normArr.push_back(vert.normal);
             uvArr.push_back(vert.uv);
         }
-        //size of buffers
-        VkDeviceSize vBuffSize = sizeof(glm::vec3) * posArr.size();
-        VkDeviceSize nBuffSize = sizeof(glm::vec3) * normArr.size();
-        VkDeviceSize uvBuffSize = sizeof(glm::vec2) * uvArr.size();
-        VkDeviceSize iBuffSize = sizeof(uint16_t) * meshData->iData.size();
 
-        //staging buffer
-        VkBuffer vStageBuff, nStageBuff, uvStageBuff, iStageBuff;
-        VkDeviceMemory vStageBuffMemory, nStageBuffMemory, uvStageBuffMemory, iStageBuffMemory;
+        enum class CType { POS, NORM, UV, INDEX };
 
-        VKBackend::createBuffer(vBuffSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, vStageBuff, vStageBuffMemory);
-        void* data;
-        vkMapMemory(device, vStageBuffMemory, 0, vBuffSize, 0, &data);
-        memcpy(data, posArr.data(), (size_t)vBuffSize);
-        vkUnmapMemory(device, vStageBuffMemory);
+        struct Container
+        {
+            VkDeviceSize buffSize;
+            void* data;
+            CType type;
+            VkBuffer stageBuff;
+            VkDeviceMemory stageBuffMemory;
+        };
 
-        VKBackend::createBuffer(nBuffSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, nStageBuff, nStageBuffMemory);
-        void* dataN;
-        vkMapMemory(device, nStageBuffMemory, 0, nBuffSize, 0, &dataN);
-        memcpy(dataN, normArr.data(), (size_t)nBuffSize);
-        vkUnmapMemory(device, nStageBuffMemory);
+        std::vector<Container> cInfos;
+        Container vCont;
+        vCont.buffSize = sizeof(glm::vec3) * posArr.size();
+        vCont.data = posArr.data();
+        vCont.type = CType::POS;
+        cInfos.push_back(vCont);
 
-        VKBackend::createBuffer(uvBuffSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uvStageBuff, uvStageBuffMemory);
-        void* dataUV;
-        vkMapMemory(device, uvStageBuffMemory, 0, uvBuffSize, 0, &dataUV);
-        memcpy(dataUV, uvArr.data(), (size_t)uvBuffSize);
-        vkUnmapMemory(device, uvStageBuffMemory);
+        Container nCont;
+        nCont.buffSize = sizeof(glm::vec3) * normArr.size();
+        nCont.data = normArr.data();
+        nCont.type = CType::NORM;
+        cInfos.push_back(nCont);
 
-        VKBackend::createBuffer(iBuffSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, iStageBuff, iStageBuffMemory);
-        void* iData;
-        vkMapMemory(device, iStageBuffMemory, 0, iBuffSize, 0, &iData);
-        memcpy(iData, meshData->iData.data(), (size_t)iBuffSize);
-        vkUnmapMemory(device, iStageBuffMemory);
+        Container uvCont;
+        uvCont.buffSize = sizeof(glm::vec2) * uvArr.size();
+        uvCont.data = uvArr.data();
+        uvCont.type = CType::UV;
+        cInfos.push_back(uvCont);
+
+        Container iCont;
+        iCont.buffSize = sizeof(uint16_t) * meshData->iData.size();
+        iCont.data = meshData->iData.data();
+        iCont.type = CType::INDEX;
+        cInfos.push_back(iCont);
+
+        for (size_t i = 0; i < cInfos.size(); i++)
+        {
+            VKBackend::createBuffer(cInfos.at(i).buffSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, cInfos.at(i).stageBuff, cInfos.at(i).stageBuffMemory);
+            vkMapMemory(device, cInfos.at(i).stageBuffMemory, 0, cInfos.at(i).buffSize, 0, &cInfos.at(i).data);
+            
+            switch (cInfos.at(i).type)
+            {
+            case CType::POS:
+                memcpy(cInfos.at(i).data, posArr.data(), (size_t)cInfos.at(i).buffSize);
+                break;
+            case CType::NORM:
+                memcpy(cInfos.at(i).data, normArr.data(), (size_t)cInfos.at(i).buffSize);
+                break;
+            case CType::UV:
+                memcpy(cInfos.at(i).data, uvArr.data(), (size_t)cInfos.at(i).buffSize);
+                break;
+            case CType::INDEX:
+                memcpy(cInfos.at(i).data, meshData->iData.data(), (size_t)cInfos.at(i).buffSize);
+                break;
+            }
+            
+            vkUnmapMemory(device, cInfos.at(i).stageBuffMemory);
+        }
 
         //create device memory backed buffer
-        VKBackend::createBuffer(vBuffSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, posBuffer, posBufferMemory);
-        VKBackend::createBuffer(nBuffSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, normBuffer, normBufferMemory);
-        VKBackend::createBuffer(uvBuffSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, uvBuffer, uvBufferMemory);
-        VKBackend::createBuffer(iBuffSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
+        VKBackend::createBuffer(cInfos.at(0).buffSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, posBuffer, posBufferMemory);
+        VKBackend::createBuffer(cInfos.at(1).buffSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, normBuffer, normBufferMemory);
+        VKBackend::createBuffer(cInfos.at(2).buffSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, uvBuffer, uvBufferMemory);
+        VKBackend::createBuffer(cInfos.at(3).buffSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
 
         //transfer memory from staging to device memory backed buffer
 
         VkCommandBuffer commandBuffer = VKBackend::beginSingleTimeCommands();
 
-        VkBufferCopy copyRegion{}, copyRegionIndex{}, copyRegionNorm{}, copyRegionUv{};
-        copyRegion.size = vBuffSize;
-        copyRegionNorm.size = nBuffSize;
-        copyRegionUv.size = uvBuffSize;
-        copyRegionIndex.size = iBuffSize;
-
-        vkCmdCopyBuffer(commandBuffer, vStageBuff, posBuffer, 1, &copyRegion);
-        vkCmdCopyBuffer(commandBuffer, nStageBuff, normBuffer, 1, &copyRegionNorm);
-        vkCmdCopyBuffer(commandBuffer, uvStageBuff, uvBuffer, 1, &copyRegionUv);
-        vkCmdCopyBuffer(commandBuffer, iStageBuff, indexBuffer, 1, &copyRegionIndex);
+        for (size_t i=0;i<cInfos.size();i++)
+        {
+            VkBufferCopy copyRegion{};
+            copyRegion.size = cInfos.at(i).buffSize;
+            switch (cInfos.at(i).type)
+            {
+            case CType::POS:
+                vkCmdCopyBuffer(commandBuffer, cInfos.at(i).stageBuff, posBuffer, 1, &copyRegion);
+                break;
+            case CType::NORM:
+                vkCmdCopyBuffer(commandBuffer, cInfos.at(i).stageBuff, normBuffer, 1, &copyRegion);
+                break;
+            case CType::UV:
+                vkCmdCopyBuffer(commandBuffer, cInfos.at(i).stageBuff, uvBuffer, 1, &copyRegion);
+                break;
+            case CType::INDEX:
+                vkCmdCopyBuffer(commandBuffer, cInfos.at(i).stageBuff, indexBuffer, 1, &copyRegion);
+                break;
+            }
+            
+        }
 
         VKBackend::endSingleTimeCommands(commandBuffer);
 
-        vkDestroyBuffer(device, vStageBuff, nullptr);
-        vkFreeMemory(device, vStageBuffMemory, nullptr);
-
-        vkDestroyBuffer(device, nStageBuff, nullptr);
-        vkFreeMemory(device, nStageBuffMemory, nullptr);
-
-        vkDestroyBuffer(device, uvStageBuff, nullptr);
-        vkFreeMemory(device, uvStageBuffMemory, nullptr);
-
-        vkDestroyBuffer(device, iStageBuff, nullptr);
-        vkFreeMemory(device, iStageBuffMemory, nullptr);
+        for (size_t i=0;i<cInfos.size();i++)
+        {
+            vkDestroyBuffer(device, cInfos.at(i).stageBuff, nullptr);
+            vkFreeMemory(device, cInfos.at(i).stageBuffMemory, nullptr);
+        }
     }
 };
 
