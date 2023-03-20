@@ -53,3 +53,7 @@ Simple clock. This demo uses push constants for per object transformations
 * Example 11
 
   PipelineVertexInputState creation using spirv reflection
+
+* Example 12
+
+  Non interleaved buffers demo.
