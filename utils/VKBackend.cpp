@@ -1516,6 +1516,125 @@ namespace VKBackend
 		return dynamicState;
 	}
 
+	void compileShader(const std::filesystem::path fPath)
+	{
+		if (std::filesystem::exists(fPath))
+		{
+			std::filesystem::path nPath(fPath);
+			std::filesystem::path ext(".spv");
+			fmt::print("compiling {}\n", fPath.string());
+			nPath.replace_extension(ext);
+
+			std::string cmd = "glslangValidator.exe -V " + fPath.string() + " -o " + nPath.string();
+			auto res = system(cmd.c_str());
+			assert(res == 0);
+		}
+	}
+
+	void compileShaders(const std::filesystem::path vsPath, const std::filesystem::path fsPath)
+	{
+		std::filesystem::path spvState("spvState.json");
+		if (std::filesystem::exists(spvState))
+		{
+			auto content = Utility::readTxtFileContents(spvState.string());
+			rapidjson::Document doc;
+			doc.Parse(content.c_str());
+
+			bool needsUpdate = true;
+			if (doc.IsArray())
+			{
+				auto arr = doc.GetArray();
+				for (rapidjson::Value::ValueIterator itr = arr.Begin(); itr != arr.End(); ++itr)
+				{
+					for (rapidjson::Value::MemberIterator itrMem = itr->MemberBegin(); itrMem != itr->MemberEnd(); itrMem++)
+					{
+						std::filesystem::path fPath(itrMem->name.GetString());
+						long long ct = std::stoll(itrMem->value.GetString());
+
+						//if (std::filesystem::exists(fPath))
+						//{
+							auto t = std::filesystem::last_write_time(fPath);
+							auto c = t.time_since_epoch().count();
+							if (c > ct)
+							{
+								/*std::filesystem::path nPath(fPath);
+								std::filesystem::path ext(".spv");
+								fmt::print("compiling {}\n", fPath.string());
+								nPath.replace_extension(ext);
+
+								std::string cmd = "glslangValidator.exe -V " + fPath.string() + " -o " + nPath.string();
+								auto res = system(cmd.c_str());
+								assert(res == 0);*/
+								compileShader(fPath);
+
+								//ToDo : update the json file
+								itrMem->value.SetString(std::to_string(c).c_str(), doc.GetAllocator());
+								needsUpdate = true;
+							}
+						//}
+					}
+				}
+			}
+			if (needsUpdate)
+			{
+				rapidjson::StringBuffer strbuf;
+				rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(strbuf);
+				doc.Accept(writer);
+
+				auto res = strbuf.GetString();
+
+				std::ofstream file("spvState.json");
+				file << res;
+				file.close();
+			}
+		}
+		else
+		{
+			rapidjson::Document doc;
+			doc.SetArray();
+
+			rapidjson::Document::AllocatorType& allocator = doc.GetAllocator();
+
+			std::vector<std::filesystem::path> paths = { vsPath,fsPath };
+
+			for (const auto& pth : paths)
+			{
+				rapidjson::Value obj(rapidjson::kObjectType);
+
+				auto t = std::filesystem::last_write_time(pth);
+				auto c = t.time_since_epoch().count();
+
+
+				rapidjson::Value key(pth.string().c_str(), allocator);
+				rapidjson::Value val(std::to_string(c).c_str(), allocator);
+				obj.AddMember(key, val, allocator);
+
+				doc.PushBack(obj, allocator);
+
+				/*std::filesystem::path nPath(pth);
+				std::filesystem::path ext(".spv");
+				fmt::print("compiling {}\n", pth.string());
+				nPath.replace_extension(ext);
+
+				std::string cmd = "glslangValidator.exe -V " + pth.string() + " -o " + nPath.string();
+				auto res = system(cmd.c_str());
+				assert(res == 0);*/
+				compileShader(pth);
+			}
+
+			// Convert JSON document to string
+			rapidjson::StringBuffer strbuf;
+			rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(strbuf);
+			doc.Accept(writer);
+
+			auto res = strbuf.GetString();
+
+			std::ofstream file("spvState.json");
+			file << res;
+			file.close();
+		}
+
+	}
 	bool supportForDescriptorIndexing(VkPhysicalDevice phyDevice)
 	{
 		VkPhysicalDeviceDescriptorIndexingFeatures index_feat

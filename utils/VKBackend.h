@@ -137,6 +137,9 @@ namespace VKBackend
 		VkPipelineColorBlendAttachmentState* pAttachments,const float blendConsts[4]);
 	VkPipelineDynamicStateCreateInfo getPipelineDynamicState(std::vector<VkDynamicState> &dynamicStates);
 
+	void compileShader(const std::filesystem::path sPath);
+	void compileShaders(const std::filesystem::path vsPath,const std::filesystem::path fsPath);
+
 	bool supportForDescriptorIndexing(VkPhysicalDevice phyDevice);
 
 }

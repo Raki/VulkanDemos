@@ -36,7 +36,7 @@
     <ClCompile Include="utils\spirv_reflect.cpp">
       <Filter>utils</Filter>
     </ClCompile>
-    <ClCompile Include="Example12.cpp">
+    <ClCompile Include="Example13.cpp">
       <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>
