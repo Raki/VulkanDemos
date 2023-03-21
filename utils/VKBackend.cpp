@@ -1533,6 +1533,7 @@ namespace VKBackend
 
 	void compileShaders(const std::filesystem::path vsPath, const std::filesystem::path fsPath)
 	{
+		std::map<std::string, std::string> newEntries;
 		std::filesystem::path spvState("spvState.json");
 		if (std::filesystem::exists(spvState))
 		{
@@ -1540,7 +1541,7 @@ namespace VKBackend
 			rapidjson::Document doc;
 			doc.Parse(content.c_str());
 
-			bool needsUpdate = true;
+			bool needsUpdate = false;
 			if (doc.IsArray())
 			{
 				auto arr = doc.GetArray();
@@ -1549,29 +1550,37 @@ namespace VKBackend
 					for (rapidjson::Value::MemberIterator itrMem = itr->MemberBegin(); itrMem != itr->MemberEnd(); itrMem++)
 					{
 						std::filesystem::path fPath(itrMem->name.GetString());
-						long long ct = std::stoll(itrMem->value.GetString());
 
-						//if (std::filesystem::exists(fPath))
-						//{
-							auto t = std::filesystem::last_write_time(fPath);
-							auto c = t.time_since_epoch().count();
-							if (c > ct)
+						const auto t = std::filesystem::last_write_time(fPath);
+						const auto lastSavedTime = t.time_since_epoch().count();
+						long long lastCompiledTime = 0;
+
+						if (fPath.string().compare(vsPath.string()) == 0 ||
+							fPath.string().compare(fsPath.string()) == 0)
+						{// existing entries
+
+							lastCompiledTime = std::stoll(itrMem->value.GetString());
+							itrMem->value.SetString(std::to_string(lastSavedTime).c_str(), doc.GetAllocator());
+							compileShader(fPath);
+							needsUpdate = true;
+						}
+						else
+						{// new entry
+							//ToDo: This needs to be updated with proper logic
+							if (fPath.string().find(".vert.glsl") != std::string::npos)
 							{
-								/*std::filesystem::path nPath(fPath);
-								std::filesystem::path ext(".spv");
-								fmt::print("compiling {}\n", fPath.string());
-								nPath.replace_extension(ext);
-
-								std::string cmd = "glslangValidator.exe -V " + fPath.string() + " -o " + nPath.string();
-								auto res = system(cmd.c_str());
-								assert(res == 0);*/
-								compileShader(fPath);
-
-								//ToDo : update the json file
-								itrMem->value.SetString(std::to_string(c).c_str(), doc.GetAllocator());
-								needsUpdate = true;
+								newEntries[vsPath.string()] = std::to_string(lastSavedTime);
+								compileShader(vsPath);
 							}
-						//}
+							else if (fPath.string().find(".frag.glsl") != std::string::npos)
+							{
+								newEntries[fsPath.string()] = std::to_string(lastSavedTime);
+								compileShader(fsPath);
+							}
+							
+							needsUpdate = true;
+						}
+						
 					}
 				}
 			}
@@ -1579,6 +1588,21 @@ namespace VKBackend
 			{
 				rapidjson::StringBuffer strbuf;
 				rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(strbuf);
+
+				if (newEntries.size() > 0)
+				{
+					rapidjson::Document::AllocatorType& allocator = doc.GetAllocator();
+					for (auto itr = newEntries.begin(); itr != newEntries.end(); itr++)
+					{
+						rapidjson::Value obj(rapidjson::kObjectType);
+						rapidjson::Value key(itr->first.c_str(), allocator);
+						rapidjson::Value val(itr->second.c_str(), allocator);
+						obj.AddMember(key, val, allocator);
+
+						doc.PushBack(obj, allocator);
+					}
+				}
+
 				doc.Accept(writer);
 
 				auto res = strbuf.GetString();
@@ -1611,14 +1635,6 @@ namespace VKBackend
 
 				doc.PushBack(obj, allocator);
 
-				/*std::filesystem::path nPath(pth);
-				std::filesystem::path ext(".spv");
-				fmt::print("compiling {}\n", pth.string());
-				nPath.replace_extension(ext);
-
-				std::string cmd = "glslangValidator.exe -V " + pth.string() + " -o " + nPath.string();
-				auto res = system(cmd.c_str());
-				assert(res == 0);*/
 				compileShader(pth);
 			}
 
