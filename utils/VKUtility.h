@@ -35,6 +35,7 @@ namespace VKUtility
 	};
 
     std::shared_ptr<Mesh> getCube(float width, float height, float depth);
+    std::shared_ptr<Mesh> getCubeOutline(glm::vec3 min,glm::vec3 max);
     std::shared_ptr<Mesh> getFSQuad();
 	unsigned char* getImageData(std::string fileanme, int& width, int& height, int& nChannels,int reqChannels= 0);
 	void freeImageData(unsigned char* data);

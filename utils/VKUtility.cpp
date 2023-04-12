@@ -220,6 +220,11 @@ namespace VKUtility
 
 		return cubeMesh;
 	}
+	std::shared_ptr<Mesh> getCubeOutline(glm::vec3 min, glm::vec3 max)
+	{
+		auto extent = max - min;
+		return getCube(extent.x,extent.y,extent.z);
+	}
 	std::shared_ptr<Mesh> getFSQuad()
 	{
 		std::vector<Vertex> vData = {
