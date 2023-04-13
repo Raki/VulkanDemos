@@ -1565,7 +1565,7 @@ void setupRandomTris()
     cube->meshData = triMesh;
     //cube->createBuffers(VKBackend::device);
     cube->createBuffNonInterleaved(VKBackend::device);
-    cube->tMatrix = glm::translate(glm::mat4(1), glm::vec3(1));
+    cube->tMatrix = glm::mat4(1);
 
     cubes.push_back(cube);
 
@@ -1575,49 +1575,49 @@ void setupRandomTris()
     BVHNode* root = &bvhNodes[0];
     stack.push_back(root);
     
-    for (size_t i=0;i<N;i++)
-    {
-        //auto node = &bvhNodes[i];
-        //auto mesh = VKUtility::getCubeOutline(node->aabbMin, node->aabbMax);
-        auto mesh = VKUtility::getCube(0.5, 0.5, 0.5);
-        auto cubeWF = std::make_shared<VKMesh>();
-        cubeWF->meshData = mesh;
-        //cube->createBuffers(VKBackend::device);
-        cubeWF->createBuffNonInterleaved(VKBackend::device);
-        //cubeWF->tMatrix = glm::translate(glm::mat4(1),(node->aabbMin+node->aabbMax)/2.0f);
-        cubeWF->rMatrix = glm::mat4(1);
-        cubeWF->tMatrix = glm::translate(glm::mat4(1), tris[i].centroid);
-
-        wireFrameObjs.push_back(cubeWF);
-    }
-
-    //int i = 0;
-    //while (stack.size()>0)
+    //for (size_t i=0;i<N;i++)
     //{
-    //    i++;
-    //    
-    //    auto node = stack.back();
-    //    stack.pop_back();
-
-    //    auto tst = (node->aabbMin + node->aabbMax) / 2.0f;
-
-    //    auto mesh = VKUtility::getCubeOutline(node->aabbMin, node->aabbMax);
+    //    //auto node = &bvhNodes[i];
+    //    //auto mesh = VKUtility::getCubeOutline(node->aabbMin, node->aabbMax);
+    //    auto mesh = VKUtility::getCube(0.5, 0.5, 0.5);
     //    auto cubeWF = std::make_shared<VKMesh>();
     //    cubeWF->meshData = mesh;
     //    //cube->createBuffers(VKBackend::device);
     //    cubeWF->createBuffNonInterleaved(VKBackend::device);
-    //    //test case
-    //    cubeWF->tMatrix = glm::translate(glm::mat4(1),(node->aabbMin+node->aabbMax)/2.0f);
+    //    //cubeWF->tMatrix = glm::translate(glm::mat4(1),(node->aabbMin+node->aabbMax)/2.0f);
+    //    cubeWF->rMatrix = glm::mat4(1);
+    //    cubeWF->tMatrix = glm::translate(glm::mat4(1), tris[i].centroid);
 
     //    wireFrameObjs.push_back(cubeWF);
-
-    //    if (!node->isLeaf())
-    //    {
-    //        stack.push_back(&bvhNodes[node->leftFirst]);
-    //        stack.push_back(&bvhNodes[node->leftFirst + 1]);
-    //    }
-    //    break;
     //}
+
+    int i = 0;
+    while (stack.size()>0)
+    {
+        i++;
+        
+        auto node = stack.back();
+        stack.pop_back();
+
+        auto tst = (node->aabbMin + node->aabbMax) / 2.0f;
+
+        auto mesh = VKUtility::getCubeOutline(node->aabbMin, node->aabbMax);
+        auto cubeWF = std::make_shared<VKMesh>();
+        cubeWF->meshData = mesh;
+        //cube->createBuffers(VKBackend::device);
+        cubeWF->createBuffNonInterleaved(VKBackend::device);
+        //test case
+        cubeWF->tMatrix = glm::translate(glm::mat4(1),(node->aabbMin+node->aabbMax)/2.0f);
+
+        wireFrameObjs.push_back(cubeWF);
+
+        if (!node->isLeaf())
+        {
+            stack.push_back(&bvhNodes[node->leftFirst]);
+            stack.push_back(&bvhNodes[node->leftFirst + 1]);
+        }
+        //break;
+    }
     
 }
 void loadGlbModel(std::string filePath)
