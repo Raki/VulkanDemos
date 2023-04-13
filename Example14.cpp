@@ -22,9 +22,9 @@ const int MAX_FRAMES_IN_FLIGHT = 2;
 const int WIN_WIDTH = 1024;
 const int WIN_HEIGHT = 1024;
 
-#define VERT_SHADER_SPV "shaders/simpleMat.vert.spv"
+#define VERT_SHADER_SPV "shaders/simpleMatBVH.vert.spv"
 #define FRAG_SHADER_SPV "shaders/simpleMat.frag.spv"
-#define VERT_SHADER_GLSL "shaders/simpleMat.vert.glsl"
+#define VERT_SHADER_GLSL "shaders/simpleMatBVH.vert.glsl"
 #define FRAG_SHADER_GLSL "shaders/simpleMat.frag.glsl"
 
 GLFWwindow* window;
@@ -345,7 +345,7 @@ std::shared_ptr<VKBackend::VKRenderTarget> msColorAttch;
 std::vector<std::shared_ptr<VKMesh>> cubes,wireFrameObjs;
 std::chrono::system_clock::time_point lastTime{};
 
-std::shared_ptr<VKBackend::VKTexture> texture;
+std::shared_ptr<VKBackend::VKTexture> texture,redTexture;
 std::vector<Descriptor> descriptors;
 
 struct FiveColors
@@ -363,6 +363,44 @@ struct FiveColors
     glm::vec3 col4;
     glm::vec3 col5;
 };
+
+//BVH
+using uint = unsigned int;
+constexpr size_t N = 50;
+
+struct Tri
+{
+    glm::vec3 v0, v1, v2;
+    glm::vec3 centroid;
+};
+
+Tri tris[N];
+uint trisIdx[N];
+
+struct Ray
+{
+    glm::vec3 O;
+    glm::vec3 D;
+    float t = 1e30f;
+};
+
+
+__declspec(align(32)) struct BVHNode
+{
+    glm::vec3 aabbMin, aabbMax;
+    uint leftFirst, //left node if triCount=0 otherwise firstTriIndex
+        triCount;
+    bool isLeaf()
+    {
+        return triCount > 0;
+    }
+
+};
+
+// For N primitives BVH will max of 2N=1 NODES  
+BVHNode bvhNodes[2 * N - 1];
+uint rootNodeIdx = 0, nodesUsed = 1;
+
 #pragma endregion vars
 
 #pragma region prototypes
@@ -391,6 +429,20 @@ void fillCube(float width, float height, float depth,glm::mat4 tMat, std::vector
 void setupScene();
 void setupRandomTris();
 void loadGlbModel(std::string filePath);
+
+//BVH
+void buildBVH();
+void intersectTri(const Tri& tri, Ray& ray);
+void updateNodeBounds(const uint& nodeIdx);
+void subdivide(uint nodeIdx);
+void intersectBVH(Ray& ray, const uint nodeIndex);
+bool intersectAABB(const Ray& ray, const glm::vec3 bMin, const glm::vec3 bMax);
+inline glm::vec3 minOf2(const glm::vec3& v1, const glm::vec3& v2);
+inline glm::vec3 maxOf2(const glm::vec3& v1, const glm::vec3& v2);
+inline void swap(Tri& tri1, Tri& tri2);
+inline void swap(uint& v1, uint& v2);
+//
+
 #pragma endregion prototypes
 
 #pragma region functions
@@ -511,6 +563,8 @@ void initVulkan()
     VKBackend::createDescriptorPool(VKBackend::device,poolsizes);
 
     texture = VKBackend::createVKTexture("img/sample.jpg");
+    //redTexture = VKBackend::createVKTexture("img/red.jpg");
+
     auto image = std::make_shared<Image>();
     image->texContainer = texture;
     VkDescriptorImageInfo imageInfo{};
@@ -518,6 +572,14 @@ void initVulkan()
     imageInfo.imageView = texture->textureImageView;
     imageInfo.sampler = texture->textureSampler;
     image->imageInfo = imageInfo;
+
+    /*auto imageRed = std::make_shared<Image>();
+    imageRed->texContainer = redTexture;
+    VkDescriptorImageInfo redImageInfo{};
+    redImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    redImageInfo.imageView = redTexture->textureImageView;
+    redImageInfo.sampler = redTexture->textureSampler;
+    imageRed->imageInfo = redImageInfo;*/
     
     for (size_t l=0;l<layoutBindings.size();l++)
     {
@@ -993,6 +1055,7 @@ VkPipeline createGraphicsPipeline(VkDevice device, VkPipelineCache pipelineCache
     }
 
     rasterizer.polygonMode = VK_POLYGON_MODE_LINE;
+    //https://github.com/KhronosGroup/Vulkan-LoaderAndValidationLayers/issues/785
     pipelineInfo.pRasterizationState = &rasterizer;
 
     if (vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineInfo, nullptr, &wireframePipeline) != VK_SUCCESS) {
@@ -1112,7 +1175,7 @@ void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex)
         
 
         PushConstant pConstant;
-        pConstant.tMat = shape->rMatrix*shape->tMatrix;
+        pConstant.tMat = shape->rMatrix* shape->tMatrix;
         //https://www.reddit.com/r/vulkan/comments/hszobo/noob_question_utilizing_multiple_vkbuffers_and/
         //https://gist.github.com/SaschaWillems/428d15ed4b5d71ead462bc63adffa93a
         vkCmdBindVertexBuffers(commandBuffer, 0, static_cast<uint32_t>(vertexBuffers.size()), vertexBuffers.data(), &offsets.at(0));
@@ -1171,7 +1234,7 @@ void updateUniformBuffer(uint32_t currentImage)
     UniformBufferObject ubo;
     //ubo.model = glm::mat4(1.0f);
     ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(time*5), glm::vec3(0.0f, 1.0f, 0.0f));
-    ubo.view = glm::lookAt(glm::vec3(0.0f, 5.f, 10.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    ubo.view = glm::lookAt(glm::vec3(0.0f, 5.f, 20.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
     ubo.proj = glm::perspective(glm::radians(45.0f), VKBackend::swapChainExtent.width / (float)VKBackend::swapChainExtent.height, 0.1f, 500.0f);
 
     auto mv = ubo.model;
@@ -1458,24 +1521,103 @@ void setupScene()
 }
 void setupRandomTris()
 {
-    auto cubeMesh = VKUtility::getCube(3, 3, 3);
+    
+    std::vector<VKUtility::Vertex> interleavedArr;
+    std::vector<uint16_t> iArr;
+
+    const auto uv1 = glm::vec2(0, 0);
+    const auto uv2 = glm::vec2(1, 0);
+    const auto uv3 = glm::vec2(0.5, 0.5);
+    for (size_t i=0;i<N;i++)
+    {
+        glm::vec3 r0((rand() % 100) / 100.0f, (rand() % 100) / 100.0f, (rand() % 100) / 100.0f);
+        glm::vec3 r1((rand() % 100) / 100.0f, (rand() % 100) / 100.0f, (rand() % 100) / 100.0f);
+        glm::vec3 r2((rand() % 100) / 100.0f, (rand() % 100) / 100.0f, (rand() % 100) / 100.0f);
+        
+        glm::vec3 p1 = r0 * 9.0f - glm::vec3(5);
+        glm::vec3 p2 = p1 + r1;
+        glm::vec3 p3 = p1 + r2;
+
+        tris[i].v0 = p1;
+        tris[i].v1 = p2;
+        tris[i].v2 = p3;
+        
+        auto n = VKUtility::getNormal(p1, p2, p3);
+        VKUtility::Vertex v1(p1, n, uv1);
+        VKUtility::Vertex v2(p2, n, uv2);
+        VKUtility::Vertex v3(p3, n, uv3);
+        interleavedArr.push_back(v1);
+        interleavedArr.push_back(v2);
+        interleavedArr.push_back(v3);
+
+        iArr.push_back(iArr.size());
+        iArr.push_back(iArr.size());
+        iArr.push_back(iArr.size());
+    }
+
+    auto triMesh = std::make_shared<VKUtility::Mesh>(interleavedArr, iArr);
+    triMesh->name = "tri mesh";
+
+
     auto cubeMeshOL = VKUtility::getCube(3.5, 3.5, 3.5);
     
     auto cube = std::make_shared<VKMesh>();
-    cube->meshData = cubeMesh;
+    cube->meshData = triMesh;
     //cube->createBuffers(VKBackend::device);
     cube->createBuffNonInterleaved(VKBackend::device);
-    cube->tMatrix = glm::mat4(1);
+    cube->tMatrix = glm::translate(glm::mat4(1), glm::vec3(1));
 
     cubes.push_back(cube);
 
-    auto cubeWF = std::make_shared<VKMesh>();
-    cubeWF->meshData = cubeMeshOL;
-    //cube->createBuffers(VKBackend::device);
-    cubeWF->createBuffNonInterleaved(VKBackend::device);
-    cubeWF->tMatrix = glm::mat4(1);
+    buildBVH();
 
-    wireFrameObjs.push_back(cubeWF);
+    std::vector<BVHNode*> stack;
+    BVHNode* root = &bvhNodes[0];
+    stack.push_back(root);
+    
+    for (size_t i=0;i<N;i++)
+    {
+        //auto node = &bvhNodes[i];
+        //auto mesh = VKUtility::getCubeOutline(node->aabbMin, node->aabbMax);
+        auto mesh = VKUtility::getCube(0.5, 0.5, 0.5);
+        auto cubeWF = std::make_shared<VKMesh>();
+        cubeWF->meshData = mesh;
+        //cube->createBuffers(VKBackend::device);
+        cubeWF->createBuffNonInterleaved(VKBackend::device);
+        //cubeWF->tMatrix = glm::translate(glm::mat4(1),(node->aabbMin+node->aabbMax)/2.0f);
+        cubeWF->rMatrix = glm::mat4(1);
+        cubeWF->tMatrix = glm::translate(glm::mat4(1), tris[i].centroid);
+
+        wireFrameObjs.push_back(cubeWF);
+    }
+
+    //int i = 0;
+    //while (stack.size()>0)
+    //{
+    //    i++;
+    //    
+    //    auto node = stack.back();
+    //    stack.pop_back();
+
+    //    auto tst = (node->aabbMin + node->aabbMax) / 2.0f;
+
+    //    auto mesh = VKUtility::getCubeOutline(node->aabbMin, node->aabbMax);
+    //    auto cubeWF = std::make_shared<VKMesh>();
+    //    cubeWF->meshData = mesh;
+    //    //cube->createBuffers(VKBackend::device);
+    //    cubeWF->createBuffNonInterleaved(VKBackend::device);
+    //    //test case
+    //    cubeWF->tMatrix = glm::translate(glm::mat4(1),(node->aabbMin+node->aabbMax)/2.0f);
+
+    //    wireFrameObjs.push_back(cubeWF);
+
+    //    if (!node->isLeaf())
+    //    {
+    //        stack.push_back(&bvhNodes[node->leftFirst]);
+    //        stack.push_back(&bvhNodes[node->leftFirst + 1]);
+    //    }
+    //    break;
+    //}
     
 }
 void loadGlbModel(std::string filePath)
@@ -1526,6 +1668,126 @@ void loadGlbModel(std::string filePath)
         }
     }
 }
+
+//BVH
+void buildBVH()
+{
+    for (size_t i = 0; i < N; i++)
+    {
+        tris[i].centroid = (tris[i].v0 + tris[i].v1 + tris[i].v2) * 0.3333f;
+        trisIdx[i] = i;
+    }
+
+    //assign all triangles to root Node
+    BVHNode& root = bvhNodes[rootNodeIdx];
+    root.leftFirst = 0;
+    root.triCount = N;
+
+    updateNodeBounds(rootNodeIdx);
+    subdivide(rootNodeIdx);
+}
+
+void updateNodeBounds(const uint& nodeIdx)
+{
+    BVHNode& node = bvhNodes[nodeIdx];
+    node.aabbMin = glm::vec3(1e30f);
+    node.aabbMax = glm::vec3(-1e30f);
+
+    for (size_t first = node.leftFirst, i = 0; i < node.triCount; i++)
+    {
+        auto leafTriIndex = trisIdx[first + i];
+        Tri& leafTri = tris[leafTriIndex];
+        node.aabbMin = minOf2(node.aabbMin, leafTri.v0);
+        node.aabbMin = minOf2(node.aabbMin, leafTri.v1);
+        node.aabbMin = minOf2(node.aabbMin, leafTri.v2);
+        node.aabbMax = maxOf2(node.aabbMax, leafTri.v0);
+        node.aabbMax = maxOf2(node.aabbMax, leafTri.v1);
+        node.aabbMax = maxOf2(node.aabbMax, leafTri.v2);
+    }
+}
+
+void subdivide(uint nodeIdx)
+{
+    BVHNode& node = bvhNodes[nodeIdx];
+    //terminate recursion
+    if (node.triCount <= 2)
+        return;
+
+    //split plane axis and position
+    auto extent = node.aabbMax - node.aabbMin;
+    int axis = 0;
+    if (extent.y > extent.x) axis = 1;
+    if (extent.z > extent[axis]) axis = 2;
+
+    float splitPos = node.aabbMin[axis] + extent[axis] * 0.5f;
+
+    int i = node.leftFirst;
+    int j = i + node.triCount - 1;
+
+    while (i <= j)
+    {
+        if (tris[trisIdx[i]].centroid[axis] < splitPos)
+        {
+            i++;
+        }
+        else
+        {
+            swap(trisIdx[i], trisIdx[j--]);
+        }
+    }
+
+    int leftCount = i - node.leftFirst;
+    if (leftCount == 0 || leftCount == node.triCount) return;
+    // create child nodes
+    int leftChildIdx = nodesUsed++;
+    int rightChildIdx = nodesUsed++;
+
+    bvhNodes[leftChildIdx].leftFirst = node.leftFirst;
+    bvhNodes[leftChildIdx].triCount = leftCount;
+
+    bvhNodes[rightChildIdx].leftFirst = i;
+    bvhNodes[rightChildIdx].triCount = node.triCount - leftCount;
+    node.triCount = 0;
+    node.leftFirst = leftChildIdx;
+
+    updateNodeBounds(leftChildIdx);
+    updateNodeBounds(rightChildIdx);
+
+    //recurse
+    subdivide(leftChildIdx);
+    subdivide(rightChildIdx);
+}
+
+inline void swap(Tri& tri1, Tri& tri2)
+{
+    Tri temp = tri1;
+    tri1 = tri2;
+    tri2 = temp;
+}
+
+inline void swap(uint& v1, uint& v2)
+{
+    auto temp = v1;
+    v1 = v2;
+    v2 = temp;
+}
+
+inline glm::vec3 minOf2(const glm::vec3& v1, const glm::vec3& v2)
+{
+    auto x = (v1.x < v2.x) ? v1.x : v2.x;
+    auto y = (v1.y < v2.y) ? v1.y : v2.y;
+    auto z = (v1.z < v2.z) ? v1.z : v2.z;
+    return glm::vec3(x, y, z);
+}
+
+inline glm::vec3 maxOf2(const glm::vec3& v1, const glm::vec3& v2)
+{
+    auto x = (v1.x > v2.x) ? v1.x : v2.x;
+    auto y = (v1.y > v2.y) ? v1.y : v2.y;
+    auto z = (v1.z > v2.z) ? v1.z : v2.z;
+    return glm::vec3(x, y, z);
+}
+
 #pragma endregion functions
 
 /*
