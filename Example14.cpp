@@ -514,6 +514,8 @@ void initVulkan()
     VKBackend::createSwapchainImageViews();
 
     VKBackend::renderPass = VKBackend::createRenerPass(VKBackend::device);
+    VKBackend::commandPool = VKBackend::createCommandPool(VKBackend::device);
+    VKBackend::createCommandBuffers(VKBackend::device, VKBackend::commandPool);
 
 
     auto vsFileContent = Utility::readBinaryFileContents(VERT_SHADER_SPV);
@@ -543,8 +545,7 @@ void initVulkan()
         layoutBindings.insert(layoutBindings.end(), set.bindings.begin(), set.bindings.end());
     }
 
-    VKBackend::commandPool = VKBackend::createCommandPool(VKBackend::device);
-    VKBackend::createCommandBuffers(VKBackend::device, VKBackend::commandPool);
+    
     
     VKBackend::createDescriptorSetLayout(layoutBindings);
     
@@ -556,7 +557,8 @@ void initVulkan()
     {
         VkDescriptorPoolSize poolSize;
         poolSize.type = descLayoutBinding.descriptorType;
-        poolSize.descriptorCount = static_cast<uint32_t>(VKBackend::swapchainMinImageCount);
+        //why x10?
+        poolSize.descriptorCount = static_cast<uint32_t>(VKBackend::swapchainMinImageCount*10);
         poolsizes.push_back(poolSize);
     }
 
@@ -1574,28 +1576,9 @@ void setupRandomTris()
     std::vector<BVHNode*> stack;
     BVHNode* root = &bvhNodes[0];
     stack.push_back(root);
-    
-    //for (size_t i=0;i<N;i++)
-    //{
-    //    //auto node = &bvhNodes[i];
-    //    //auto mesh = VKUtility::getCubeOutline(node->aabbMin, node->aabbMax);
-    //    auto mesh = VKUtility::getCube(0.5, 0.5, 0.5);
-    //    auto cubeWF = std::make_shared<VKMesh>();
-    //    cubeWF->meshData = mesh;
-    //    //cube->createBuffers(VKBackend::device);
-    //    cubeWF->createBuffNonInterleaved(VKBackend::device);
-    //    //cubeWF->tMatrix = glm::translate(glm::mat4(1),(node->aabbMin+node->aabbMax)/2.0f);
-    //    cubeWF->rMatrix = glm::mat4(1);
-    //    cubeWF->tMatrix = glm::translate(glm::mat4(1), tris[i].centroid);
 
-    //    wireFrameObjs.push_back(cubeWF);
-    //}
-
-    int i = 0;
     while (stack.size()>0)
     {
-        i++;
-        
         auto node = stack.back();
         stack.pop_back();
 
