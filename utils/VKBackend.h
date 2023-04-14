@@ -44,6 +44,45 @@ namespace VKBackend
 		std::vector<VkDescriptorSetLayoutBinding> bindings;
 	};
 
+
+	struct Buffer
+	{
+		std::vector<VkBuffer> uniformBuffers;
+		std::vector<VkDeviceMemory> uniformBufferMemories;
+		VkDeviceSize range = 0;
+		std::vector<VkDescriptorBufferInfo> bufferInfo;
+		bool isDirtry = true;
+		Buffer()
+		{
+
+		}
+		Buffer(const Buffer& buff)
+		{
+			uniformBuffers.clear();
+			uniformBuffers.insert(uniformBuffers.begin(), buff.uniformBuffers.begin(), buff.uniformBuffers.end());
+			uniformBufferMemories.clear();
+			uniformBufferMemories.insert(uniformBufferMemories.begin(), buff.uniformBufferMemories.begin(), buff.uniformBufferMemories.end());
+			bufferInfo.clear();
+			bufferInfo.insert(bufferInfo.begin(), buff.bufferInfo.begin(), buff.bufferInfo.end());
+			range = buff.range;
+			isDirtry = buff.isDirtry;
+		}
+
+	};
+
+	struct Image
+	{
+		std::shared_ptr<VKBackend::VKTexture> texContainer;
+		VkDescriptorImageInfo imageInfo;
+	};
+
+	struct Descriptor
+	{
+		VkDescriptorSetLayoutBinding layout;
+		std::shared_ptr<Buffer> buffer;
+		std::shared_ptr<Image> image;
+	};
+
 	extern VkInstance vkInstance;
 	extern VkSurfaceKHR surface;
 	extern VkPhysicalDevice physicalDevice;
@@ -102,6 +141,7 @@ namespace VKBackend
 	void getInputInfoFromSpv(const std::vector<unsigned char>& fileContent, std::vector<VkVertexInputAttributeDescription> &vertIPAttribDesc,
 		std::vector<VkVertexInputBindingDescription> &vertIPBindDesc,bool interleaved=true);
 	void createDescriptorSetLayout(std::vector <VkDescriptorSetLayoutBinding> layoutBindings);
+	VkDescriptorSetLayout getDescriptorSetLayout(std::vector <VkDescriptorSetLayoutBinding> layoutBindings);
 	void createDescriptorPool(VkDevice device, std::vector<VkDescriptorPoolSize> poolsizes);
 
 	VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);

@@ -1027,13 +1027,25 @@ namespace VKBackend
 		VK_CHECK(vkCreateDescriptorSetLayout(VKBackend::device, &createInfo, nullptr, &VKBackend::descriptorSetLayout));
 	}
 
+	VkDescriptorSetLayout getDescriptorSetLayout(std::vector<VkDescriptorSetLayoutBinding> layoutBindings)
+	{
+		VkDescriptorSetLayout descriptorSetLayout;
+		VkDescriptorSetLayoutCreateInfo createInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+		createInfo.bindingCount = static_cast<uint32_t>(layoutBindings.size());
+		createInfo.pBindings = layoutBindings.data();
+		VK_CHECK(vkCreateDescriptorSetLayout(VKBackend::device, &createInfo, nullptr, &descriptorSetLayout));
+
+		return descriptorSetLayout;
+	}
+
 	void createDescriptorPool(VkDevice device, std::vector<VkDescriptorPoolSize> poolsizes)
 	{
 		VkDescriptorPoolCreateInfo createInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
 
 		createInfo.poolSizeCount = static_cast<uint32_t>(poolsizes.size());;
 		createInfo.pPoolSizes = poolsizes.data();
-		createInfo.maxSets = static_cast<uint32_t>(VKBackend::swapchainMinImageCount);
+		//why x10?
+		createInfo.maxSets = static_cast<uint32_t>(VKBackend::swapchainMinImageCount*10);
 
 		VK_CHECK(vkCreateDescriptorPool(device, &createInfo, nullptr, &VKBackend::descriptorPool));
 	}

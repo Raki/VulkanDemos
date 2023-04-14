@@ -19,13 +19,14 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Example12.cpp" />
+    <ClCompile Include="Example14.cpp" />
     <ClCompile Include="imgui\imgui_impl_glfw.cpp" />
     <ClCompile Include="imgui\imgui_impl_vulkan.cpp" />
     <ClCompile Include="utils\Colors.cpp" />
     <ClCompile Include="utils\spirv_reflect.cpp" />
     <ClCompile Include="utils\Utility.cpp" />
     <ClCompile Include="utils\VKBackend.cpp" />
+    <ClCompile Include="utils\VKPso.cpp" />
     <ClCompile Include="utils\VKUtility.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -38,6 +39,7 @@
     <ClInclude Include="utils\stb_image.h" />
     <ClInclude Include="utils\Utility.h" />
     <ClInclude Include="utils\VKBackend.h" />
+    <ClInclude Include="utils\VKPso.h" />
     <ClInclude Include="utils\VKUtility.h" />
   </ItemGroup>
   <ItemGroup>
