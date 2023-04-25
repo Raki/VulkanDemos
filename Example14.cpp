@@ -347,6 +347,7 @@ std::chrono::system_clock::time_point lastTime{};
 
 std::shared_ptr<VKBackend::VKTexture> texture,redTexture;
 std::vector<Descriptor> descriptors;
+std::vector<VkDescriptorSet> testDescriptorSets;
 
 struct FiveColors
 {
@@ -413,6 +414,7 @@ void destroyVulkan();
 VkSurfaceKHR createSurface(GLFWwindow* window, VkInstance instace);
 void createUniformBuffers();
 void createDescriptorSets(const VkDevice device, const std::vector<Descriptor>& descriptors);
+void createDescriptorSets(const VkDevice device, const std::vector<Descriptor>& descriptors,std::vector<VkDescriptorSet> &descSets);
 void createPipelineCache(const VkDevice device);
 VkPipeline createGraphicsPipeline(VkDevice device, VkRenderPass renderPass, VkShaderModule vsModule, VkShaderModule fsModule);
 //ToDo: Any chance to improve this?
@@ -503,7 +505,7 @@ void initVulkan()
     bool bindlessResources = VKBackend::supportForDescriptorIndexing(VKBackend::physicalDevice);
 
     if(bindlessResources)
-        fmt::print("GPU supports descriptor indexing");
+        fmt::print("GPU supports descriptor indexing\n");
 
     VKBackend::device = VKBackend::createDevice(VKBackend::physicalDevice);
 
@@ -608,7 +610,8 @@ void initVulkan()
         descriptors.push_back(descriptor);
     }
 
-    createDescriptorSets(VKBackend::device,descriptors);
+    //createDescriptorSets(VKBackend::device,descriptors);
+    createDescriptorSets(VKBackend::device, descriptors,VKBackend::descriptorSets);
 
     createPipelineCache(VKBackend::device);
     VKBackend::graphicsPipeline = createGraphicsPipeline(VKBackend::device,pipelineCache, VKBackend::renderPass, triangleVS, triangleFS,
@@ -638,108 +641,16 @@ void updateFrame()
 }
 void compileShaders()
 {
-    //ToDo: 
-    //1. Solve the bug when no existing spv files are there
-    //2. Make this work for any set of shaders with keeping the old ones intact
-    std::filesystem::path spvState("spvState.json");
-    if (std::filesystem::exists(spvState))
-    {
-        auto content = Utility::readTxtFileContents(spvState.string());
-        rapidjson::Document doc;
-        doc.Parse(content.c_str());
-
-        bool needsUpdate = true;
-        if (doc.IsArray())
-        {
-            auto arr = doc.GetArray();
-            for (rapidjson::Value::ValueIterator itr = arr.Begin(); itr != arr.End(); ++itr)
-            {
-                for (rapidjson::Value::MemberIterator itrMem =itr->MemberBegin();itrMem!=itr->MemberEnd();itrMem++)
-                {
-                    std::filesystem::path fPath(itrMem->name.GetString());
-                    long long ct = std::stoll(itrMem->value.GetString());
-
-                    if (std::filesystem::exists(fPath))
-                    {
-                        auto t = std::filesystem::last_write_time(fPath);
-                        auto c = t.time_since_epoch().count();
-                        if (c > ct)
-                        {
-                            std::filesystem::path nPath(fPath);
-                            std::filesystem::path ext(".spv");
-                            fmt::print("compiling {}\n",fPath.string());
-                            nPath.replace_extension(ext);
-                            
-                            std::string cmd = "glslangValidator.exe -V " + fPath.string() + " -o "+nPath.string();
-                            auto res = system(cmd.c_str());
-                            assert(res == 0);
-                            //ToDo : update the json file
-                            itrMem->value.SetString(std::to_string(c).c_str(),doc.GetAllocator());
-                            needsUpdate = true;
-                        }
-                    }
-                }
-            }
-        }
-        if (needsUpdate)
-        {
-            rapidjson::StringBuffer strbuf;
-            rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(strbuf);
-            doc.Accept(writer);
-
-            auto res = strbuf.GetString();
-
-            std::ofstream file("spvState.json");
-            file << res;
-            file.close();
-        }
-    }
-    else
-    {
-        rapidjson::Document doc;
-        doc.SetArray();
-
-        rapidjson::Document::AllocatorType& allocator = doc.GetAllocator();
-
-        std::filesystem::path fs(VERT_SHADER_GLSL);
-        std::filesystem::path vs(FRAG_SHADER_GLSL);
-
-        std::vector<std::filesystem::path> paths = {vs,fs};
-
-        for (const auto& pth : paths)
-        {
-            if (std::filesystem::exists(pth))
-            {
-                rapidjson::Value obj(rapidjson::kObjectType);
-                
-                auto t = std::filesystem::last_write_time(pth);
-                auto c = t.time_since_epoch().count();
-                
-                rapidjson::Value key(pth.string().c_str(), allocator);
-                rapidjson::Value val(std::to_string(c).c_str(), allocator);
-                obj.AddMember(key, val, allocator);
-
-                doc.PushBack(obj, allocator);
-            }
-        }
-     
-        // Convert JSON document to string
-        rapidjson::StringBuffer strbuf;
-        rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(strbuf);
-        doc.Accept(writer);
-
-        auto res  = strbuf.GetString();
-
-        std::ofstream file("spvState.json");
-        file << res;
-        file.close();
-    }
-    //rapidjson::
     //ToDo : Compile only file content is changed
-   /* auto res = system("glslangValidator.exe -V ./shaders/solidShapes3D.frag.glsl -o ./shaders/solidShapes3D.frag.spv");
+    auto res = system("glslangValidator.exe -V ./shaders/simpleMat.frag.glsl -o ./shaders/simpleMat.frag.spv");
     assert(res == 0);
-    res = system("glslangValidator.exe -V ./shaders/solidShapes3D.vert.glsl -o ./shaders/solidShapes3D.vert.spv");
-    assert(res == 0);*/
+    res = system("glslangValidator.exe -V ./shaders/simpleMatBVH.vert.glsl -o ./shaders/simpleMatBVH.vert.spv");
+    assert(res == 0);
+
+    res = system("glslangValidator.exe -V ./shaders/simpleMatFlat.frag.glsl -o ./shaders/simpleMatFlat.frag.spv");
+    assert(res == 0);
+    res = system("glslangValidator.exe -V ./shaders/simpleMatBVHFlat.vert.glsl -o ./shaders/simpleMatBVHFlat.vert.spv");
+    assert(res == 0);
 }
 void destroyVulkan()
 {
@@ -919,6 +830,50 @@ void createDescriptorSets(const VkDevice device, const std::vector<Descriptor>& 
                 descriptorWrites.at(d).pImageInfo = &descriptors.at(d).image->imageInfo;
             }
             
+        }
+
+        vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+    }
+}
+void createDescriptorSets(const VkDevice device, const std::vector<Descriptor>& descriptors, std::vector<VkDescriptorSet>& descSets)
+{
+    std::vector<VkDescriptorSetLayout> layouts(VKBackend::swapchainMinImageCount, VKBackend::descriptorSetLayout);
+    VkDescriptorSetAllocateInfo allocateInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+    allocateInfo.descriptorPool = VKBackend::descriptorPool;
+    allocateInfo.descriptorSetCount = static_cast<uint32_t>(3);
+    allocateInfo.pSetLayouts = layouts.data();;
+
+    descSets.resize(VKBackend::swapchainMinImageCount);
+
+    if (vkAllocateDescriptorSets(device, &allocateInfo, descSets.data()) != VK_SUCCESS)
+    {
+        throw std::runtime_error("failed to allocate descriptor sets!");
+    }
+
+    for (size_t i = 0; i < VKBackend::swapchainMinImageCount; i++)
+    {
+        std::vector<VkWriteDescriptorSet> descriptorWrites(descriptors.size());
+
+        for (size_t d = 0; d < descriptors.size(); d++)
+        {
+            descriptorWrites.at(d).sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites.at(d).dstSet = descSets[i];
+            descriptorWrites.at(d).dstBinding = descriptors.at(d).layout.binding;
+            descriptorWrites.at(d).dstArrayElement = 0;
+            descriptorWrites.at(d).descriptorType = descriptors.at(d).layout.descriptorType;
+            descriptorWrites.at(d).descriptorCount = descriptors.at(d).layout.descriptorCount;
+            if (descriptors.at(d).layout.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+            {
+                descriptors.at(d).buffer->bufferInfo.at(i).buffer = descriptors.at(d).buffer->uniformBuffers.at(i);
+                descriptors.at(d).buffer->bufferInfo.at(i).offset = 0;
+                descriptors.at(d).buffer->bufferInfo.at(i).range = descriptors.at(d).buffer->range;
+                descriptorWrites.at(d).pBufferInfo = &descriptors.at(d).buffer->bufferInfo.at(i);
+            }
+            else if (descriptors.at(d).layout.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+            {
+                descriptorWrites.at(d).pImageInfo = &descriptors.at(d).image->imageInfo;
+            }
+
         }
 
         vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);

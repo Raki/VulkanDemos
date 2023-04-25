@@ -36,8 +36,11 @@
     <ClCompile Include="utils\spirv_reflect.cpp">
       <Filter>utils</Filter>
     </ClCompile>
-    <ClCompile Include="Example13.cpp">
+    <ClCompile Include="Example14.cpp">
       <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="utils\VKPso.cpp">
+      <Filter>utils</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -69,6 +72,9 @@
       <Filter>imgui</Filter>
     </ClInclude>
     <ClInclude Include="utils\spirv_reflect.h">
+      <Filter>utils</Filter>
+    </ClInclude>
+    <ClInclude Include="utils\VKPso.h">
       <Filter>utils</Filter>
     </ClInclude>
   </ItemGroup>
