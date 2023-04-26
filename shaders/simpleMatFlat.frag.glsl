@@ -10,9 +10,6 @@ layout (binding=1) uniform LightInfo
 	vec4 color;
 }lInfo;
 
-
-layout(binding = 2) uniform sampler2D texSampler;
-
 float getDiffuseFactr()
 {
 	vec3 lightDir = normalize(lInfo.position.xyz-fraPos_out); 
@@ -29,7 +26,7 @@ vec3 getDiffuseColrVertex()
 
 vec3 getAmbientColor()
 {
-	return vec3(0.2);
+	return vec3(0.3);
 }
 
 

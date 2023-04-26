@@ -283,7 +283,109 @@ struct VKMesh3D : public VKMesh
 
     void createBuffNonInterleaved(const VkDevice& device)  
     {
-        fmt::print("override called");
+        isInterleaved = false;
+
+        std::vector<glm::vec3> posArr;
+        std::vector<glm::vec3> normArr;
+
+        for (auto& vert : meshData->vDataOL)
+        {
+            posArr.push_back(vert.position);
+            normArr.push_back(vert.normal);
+        }
+
+        enum class CType { POS, NORM, UV, INDEX };
+
+        struct Container
+        {
+            VkDeviceSize buffSize;
+            void* data;
+            CType type;
+            VkBuffer stageBuff;
+            VkDeviceMemory stageBuffMemory;
+        };
+
+        std::vector<Container> cInfos;
+        Container vCont;
+        vCont.buffSize = sizeof(glm::vec3) * posArr.size();
+        vCont.data = posArr.data();
+        vCont.type = CType::POS;
+        cInfos.push_back(vCont);
+
+        Container nCont;
+        nCont.buffSize = sizeof(glm::vec3) * normArr.size();
+        nCont.data = normArr.data();
+        nCont.type = CType::NORM;
+        cInfos.push_back(nCont);
+
+        Container iCont;
+        iCont.buffSize = sizeof(uint16_t) * meshData->iData.size();
+        iCont.data = meshData->iData.data();
+        iCont.type = CType::INDEX;
+        cInfos.push_back(iCont);
+
+        for (size_t i = 0; i < cInfos.size(); i++)
+        {
+            VKBackend::createBuffer(cInfos.at(i).buffSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, cInfos.at(i).stageBuff, cInfos.at(i).stageBuffMemory);
+            vkMapMemory(device, cInfos.at(i).stageBuffMemory, 0, cInfos.at(i).buffSize, 0, &cInfos.at(i).data);
+
+            switch (cInfos.at(i).type)
+            {
+            case CType::POS:
+                memcpy(cInfos.at(i).data, posArr.data(), (size_t)cInfos.at(i).buffSize);
+                break;
+            case CType::NORM:
+                memcpy(cInfos.at(i).data, normArr.data(), (size_t)cInfos.at(i).buffSize);
+                break;
+            case CType::UV:
+                
+                break;
+            case CType::INDEX:
+                memcpy(cInfos.at(i).data, meshData->iData.data(), (size_t)cInfos.at(i).buffSize);
+                break;
+            }
+
+            vkUnmapMemory(device, cInfos.at(i).stageBuffMemory);
+        }
+
+        //create device memory backed buffer
+        VKBackend::createBuffer(cInfos.at(0).buffSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, posBuffer, posBufferMemory);
+        VKBackend::createBuffer(cInfos.at(1).buffSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, normBuffer, normBufferMemory);
+        VKBackend::createBuffer(cInfos.at(2).buffSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
+
+        //transfer memory from staging to device memory backed buffer
+
+        VkCommandBuffer commandBuffer = VKBackend::beginSingleTimeCommands();
+
+        for (size_t i = 0; i < cInfos.size(); i++)
+        {
+            VkBufferCopy copyRegion{};
+            copyRegion.size = cInfos.at(i).buffSize;
+            switch (cInfos.at(i).type)
+            {
+            case CType::POS:
+                vkCmdCopyBuffer(commandBuffer, cInfos.at(i).stageBuff, posBuffer, 1, &copyRegion);
+                break;
+            case CType::NORM:
+                vkCmdCopyBuffer(commandBuffer, cInfos.at(i).stageBuff, normBuffer, 1, &copyRegion);
+                break;
+            case CType::UV:
+                
+                break;
+            case CType::INDEX:
+                vkCmdCopyBuffer(commandBuffer, cInfos.at(i).stageBuff, indexBuffer, 1, &copyRegion);
+                break;
+            }
+
+        }
+
+        VKBackend::endSingleTimeCommands(commandBuffer);
+
+        for (size_t i = 0; i < cInfos.size(); i++)
+        {
+            vkDestroyBuffer(device, cInfos.at(i).stageBuff, nullptr);
+            vkFreeMemory(device, cInfos.at(i).stageBuffMemory, nullptr);
+        }
     }
 };
 
@@ -358,7 +460,8 @@ VkPipeline wireframePipeline=VK_NULL_HANDLE;
 VkPipelineLayout wireframePipelineLayout;
 
 std::shared_ptr<VKBackend::VKRenderTarget> msColorAttch;
-std::vector<std::shared_ptr<VKMesh>> cubes,wireFrameObjs;
+std::vector<std::shared_ptr<VKMesh>> cubes;
+std::vector<std::shared_ptr<VKMesh3D>> wireFrameObjs;
 std::chrono::system_clock::time_point lastTime{};
 
 std::shared_ptr<VKBackend::VKTexture> texture,redTexture;
@@ -442,7 +545,8 @@ VkPipeline createGraphicsPipeline(VkDevice device,VkPipelineCache pipelineCache 
     std::vector<VkVertexInputAttributeDescription>& vertIPAttribDesc, 
     std::vector<VkVertexInputBindingDescription>& vertIPBindDesc,
     const VkPipelineLayout pipelineLayout,
-    const VkPolygonMode polygonMode);
+    const VkPolygonMode polygonMode,
+    const VkPrimitiveTopology primToplogy);
 void createFramebuffers();
 void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
@@ -602,10 +706,10 @@ void initVulkan()
 
     createPipelineCache(VKBackend::device);
     VKBackend::graphicsPipeline = createGraphicsPipeline(VKBackend::device,pipelineCache, VKBackend::renderPass, result.triangleVS, result.triangleFS,
-        result.vertIPAttribDesc,result.vertIPBindDesc, VKBackend::pipelineLayout,VK_POLYGON_MODE_FILL);
+        result.vertIPAttribDesc,result.vertIPBindDesc, VKBackend::pipelineLayout,VK_POLYGON_MODE_FILL, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 
     wireframePipeline = createGraphicsPipeline(VKBackend::device, pipelineCache, VKBackend::renderPass, resultFlat.triangleVS, resultFlat.triangleFS,
-        resultFlat.vertIPAttribDesc, resultFlat.vertIPBindDesc, wireframePipelineLayout,VK_POLYGON_MODE_LINE);
+        resultFlat.vertIPAttribDesc, resultFlat.vertIPBindDesc, wireframePipelineLayout,VK_POLYGON_MODE_LINE, VK_PRIMITIVE_TOPOLOGY_LINE_LIST);
 
     vkDestroyShaderModule(VKBackend::device, result.triangleVS, nullptr);
     vkDestroyShaderModule(VKBackend::device, result.triangleFS, nullptr);
@@ -1055,7 +1159,8 @@ VkPipeline createGraphicsPipeline(VkDevice device, VkPipelineCache pipelineCache
     std::vector<VkVertexInputAttributeDescription>& vertIPAttribDesc, 
     std::vector<VkVertexInputBindingDescription>& vertIPBindDesc,
     const VkPipelineLayout pipelineLayout,
-    const VkPolygonMode polygonMode)
+    const VkPolygonMode polygonMode,
+    const VkPrimitiveTopology primToplogy)
 {
     VkPipelineShaderStageCreateInfo stages[2] = {};
     stages[0] = VKBackend::getPipelineShaderStage(VK_SHADER_STAGE_VERTEX_BIT, vsModule);
@@ -1063,7 +1168,7 @@ VkPipeline createGraphicsPipeline(VkDevice device, VkPipelineCache pipelineCache
 
     auto vertexInputInfo = VKBackend::getPipelineVertexInputState(static_cast<uint32_t>(vertIPBindDesc.size()), vertIPBindDesc.data(), static_cast<uint32_t>(vertIPAttribDesc.size()),
         vertIPAttribDesc.data());
-    auto inputAssembly = VKBackend::getPipelineInputAssemblyState(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_FALSE);
+    auto inputAssembly = VKBackend::getPipelineInputAssemblyState(primToplogy, VK_FALSE);
     auto viewportState = VKBackend::getPipelineViewportState(1, 1);
     auto rasterizer = VKBackend::getPipelineRasterState(polygonMode, 1.0f);
     auto multisampling = VKBackend::getPipelineMultisampleState(VK_FALSE, VKBackend::msaaSamples);
@@ -1598,9 +1703,9 @@ void setupRandomTris()
         interleavedArr.push_back(v2);
         interleavedArr.push_back(v3);
 
-        iArr.push_back(iArr.size());
-        iArr.push_back(iArr.size());
-        iArr.push_back(iArr.size());
+        iArr.push_back(static_cast<uint16_t>(iArr.size()));
+        iArr.push_back(static_cast<uint16_t>(iArr.size()));
+        iArr.push_back(static_cast<uint16_t>(iArr.size()));
     }
 
     auto triMesh = std::make_shared<VKUtility::Mesh>(interleavedArr, iArr);
@@ -1631,7 +1736,7 @@ void setupRandomTris()
         auto tst = (node->aabbMin + node->aabbMax) / 2.0f;
 
         auto mesh = VKUtility::getCubeOutline(node->aabbMin, node->aabbMax);
-        auto cubeWF = std::make_shared<VKMesh>();
+        auto cubeWF = std::make_shared<VKMesh3D>();
         cubeWF->meshData = mesh;
         //cube->createBuffers(VKBackend::device);
         cubeWF->createBuffNonInterleaved(VKBackend::device);
@@ -1704,7 +1809,7 @@ void buildBVH()
     for (size_t i = 0; i < N; i++)
     {
         tris[i].centroid = (tris[i].v0 + tris[i].v1 + tris[i].v2) * 0.3333f;
-        trisIdx[i] = i;
+        trisIdx[i] = static_cast<uint>(i);
     }
 
     //assign all triangles to root Node
