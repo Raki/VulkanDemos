@@ -362,6 +362,8 @@ std::vector<std::shared_ptr<VKMesh>> cubes,wireFrameObjs;
 std::chrono::system_clock::time_point lastTime{};
 
 std::shared_ptr<VKBackend::VKTexture> texture,redTexture;
+
+VkDescriptorSetLayout descLayoutFlat;
 std::vector<Descriptor> descriptors, descriptorsFlat;
 std::vector<VkDescriptorSet> descriptorSetsFlat;
 
@@ -438,7 +440,9 @@ VkPipeline createGraphicsPipeline(VkDevice device, VkRenderPass renderPass, VkSh
 //ToDo: Any chance to improve this?
 VkPipeline createGraphicsPipeline(VkDevice device,VkPipelineCache pipelineCache , VkRenderPass renderPass, VkShaderModule vsModule, VkShaderModule fsModule,
     std::vector<VkVertexInputAttributeDescription>& vertIPAttribDesc, 
-    std::vector<VkVertexInputBindingDescription>& vertIPBindDesc);
+    std::vector<VkVertexInputBindingDescription>& vertIPBindDesc,
+    const VkPipelineLayout pipelineLayout,
+    const VkPolygonMode polygonMode);
 void createFramebuffers();
 void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
@@ -570,21 +574,42 @@ void initVulkan()
     image->imageInfo = imageInfo;
 
 
-    DescSetBuildResult result;
+    DescSetBuildResult result,resultFlat;
 
     buildDescriptorsFor(FRAG_SHADER_SPV, VERT_SHADER_SPV, result, image);
+    buildDescriptorsFor("shaders/simpleMatFlat.frag.spv", "shaders/simpleMatBVHFlat.vert.spv", resultFlat, nullptr);
 
     VKBackend::descriptorSetLayout = result.descSetLayout;
     VKBackend::descriptorSets = result.descSets;
     descriptors = result.descriptors;
 
+    descriptorSetsFlat = resultFlat.descSets;
+    descriptorsFlat = resultFlat.descriptors;
+    descLayoutFlat = resultFlat.descSetLayout;
+
+
+    VkPushConstantRange pushConstant;
+    pushConstant.offset = 0;
+    pushConstant.size = sizeof(PushConstant);
+    pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+    std::vector<VkPushConstantRange> pushConstants = { pushConstant };
+    std::vector<VkDescriptorSetLayout> descriptorLayouts = { VKBackend::descriptorSetLayout };
+
+    VKBackend::pipelineLayout = VKBackend::createPipelineLayout(descriptorLayouts, pushConstants);
 
     createPipelineCache(VKBackend::device);
     VKBackend::graphicsPipeline = createGraphicsPipeline(VKBackend::device,pipelineCache, VKBackend::renderPass, result.triangleVS, result.triangleFS,
-        result.vertIPAttribDesc,result.vertIPBindDesc);
+        result.vertIPAttribDesc,result.vertIPBindDesc, VKBackend::pipelineLayout,VK_POLYGON_MODE_FILL);
+
+    wireframePipeline = createGraphicsPipeline(VKBackend::device, pipelineCache, VKBackend::renderPass, result.triangleVS, result.triangleFS,
+        result.vertIPAttribDesc, result.vertIPBindDesc, VKBackend::pipelineLayout,VK_POLYGON_MODE_LINE);
 
     vkDestroyShaderModule(VKBackend::device, result.triangleVS, nullptr);
     vkDestroyShaderModule(VKBackend::device, result.triangleFS, nullptr);
+
+    vkDestroyShaderModule(VKBackend::device, resultFlat.triangleVS, nullptr);
+    vkDestroyShaderModule(VKBackend::device, resultFlat.triangleFS, nullptr);
 
     createColorResource();
     createDepthResources();
@@ -778,6 +803,7 @@ void destroyVulkan()
 
     vkDestroyDescriptorPool(VKBackend::device, VKBackend::descriptorPool, nullptr);
     vkDestroyDescriptorSetLayout(VKBackend::device, VKBackend::descriptorSetLayout, nullptr);
+    vkDestroyDescriptorSetLayout(VKBackend::device, descLayoutFlat, nullptr);
 
     vkDestroyDevice(VKBackend::device, nullptr);
     vkDestroySurfaceKHR(VKBackend::vkInstance, VKBackend::surface, nullptr);
@@ -1024,7 +1050,9 @@ VkPipeline createGraphicsPipeline(VkDevice device, VkRenderPass renderPass, VkSh
 }
 VkPipeline createGraphicsPipeline(VkDevice device, VkPipelineCache pipelineCache, VkRenderPass renderPass, VkShaderModule vsModule, VkShaderModule fsModule,
     std::vector<VkVertexInputAttributeDescription>& vertIPAttribDesc, 
-    std::vector<VkVertexInputBindingDescription>& vertIPBindDesc)
+    std::vector<VkVertexInputBindingDescription>& vertIPBindDesc,
+    const VkPipelineLayout pipelineLayout,
+    const VkPolygonMode polygonMode)
 {
     VkPipelineShaderStageCreateInfo stages[2] = {};
     stages[0] = VKBackend::getPipelineShaderStage(VK_SHADER_STAGE_VERTEX_BIT, vsModule);
@@ -1034,7 +1062,7 @@ VkPipeline createGraphicsPipeline(VkDevice device, VkPipelineCache pipelineCache
         vertIPAttribDesc.data());
     auto inputAssembly = VKBackend::getPipelineInputAssemblyState(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_FALSE);
     auto viewportState = VKBackend::getPipelineViewportState(1, 1);
-    auto rasterizer = VKBackend::getPipelineRasterState(VK_POLYGON_MODE_FILL, 1.0f);
+    auto rasterizer = VKBackend::getPipelineRasterState(polygonMode, 1.0f);
     auto multisampling = VKBackend::getPipelineMultisampleState(VK_FALSE, VKBackend::msaaSamples);
     auto depthStencil = VKBackend::getPipelineDepthStencilState(VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS, VK_FALSE, 0.0f, 1.0f, VK_FALSE);
 
@@ -1047,16 +1075,6 @@ VkPipeline createGraphicsPipeline(VkDevice device, VkPipelineCache pipelineCache
         VK_DYNAMIC_STATE_SCISSOR
     };
     auto dynamicState = VKBackend::getPipelineDynamicState(dynamicStates);
-
-    VkPushConstantRange pushConstant;
-    pushConstant.offset = 0;
-    pushConstant.size = sizeof(PushConstant);
-    pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-    std::vector<VkPushConstantRange> pushConstants = { pushConstant };
-    std::vector<VkDescriptorSetLayout> descriptorLayouts = { VKBackend::descriptorSetLayout };
-
-    VKBackend::pipelineLayout = VKBackend::createPipelineLayout(descriptorLayouts, pushConstants);
 
     VkPipeline graphicsPipeline;
     VkGraphicsPipelineCreateInfo pipelineInfo{};
@@ -1071,7 +1089,7 @@ VkPipeline createGraphicsPipeline(VkDevice device, VkPipelineCache pipelineCache
     pipelineInfo.pColorBlendState = &colorBlending;
     pipelineInfo.pDynamicState = &dynamicState;
     pipelineInfo.pDepthStencilState = &depthStencil;
-    pipelineInfo.layout = VKBackend::pipelineLayout;
+    pipelineInfo.layout = pipelineLayout;
     pipelineInfo.renderPass = renderPass;
     pipelineInfo.subpass = 0;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
@@ -1080,13 +1098,13 @@ VkPipeline createGraphicsPipeline(VkDevice device, VkPipelineCache pipelineCache
         throw std::runtime_error("failed to create graphics pipeline!");
     }
 
-    rasterizer.polygonMode = VK_POLYGON_MODE_LINE;
-    //https://github.com/KhronosGroup/Vulkan-LoaderAndValidationLayers/issues/785
-    pipelineInfo.pRasterizationState = &rasterizer;
+    //rasterizer.polygonMode = VK_POLYGON_MODE_LINE;
+    ////https://github.com/KhronosGroup/Vulkan-LoaderAndValidationLayers/issues/785
+    //pipelineInfo.pRasterizationState = &rasterizer;
 
-    if (vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineInfo, nullptr, &wireframePipeline) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create graphics pipeline for wireframe !");
-    }
+    //if (vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineInfo, nullptr, &wireframePipeline) != VK_SUCCESS) {
+    //    throw std::runtime_error("failed to create graphics pipeline for wireframe !");
+    //}
 
     return graphicsPipeline;
 }
