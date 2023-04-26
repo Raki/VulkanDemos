@@ -29,12 +29,15 @@ namespace VKUtility
 	struct Mesh
 	{
         std::vector<Vertex> vData;
+        std::vector<VDPosNorm> vDataOL;
         std::vector<uint16_t> iData;
         std::string name;
         Mesh(std::vector<Vertex> vData, std::vector<uint16_t> iData);
+        Mesh(std::vector<VDPosNorm> vData, std::vector<uint16_t> iData);
 	};
 
     std::shared_ptr<Mesh> getCube(float width, float height, float depth);
+    std::shared_ptr<Mesh> getCube(const glm::vec3 min,const glm::vec3 max);
     std::shared_ptr<Mesh> getCubeOutline(glm::vec3 min,glm::vec3 max);
     std::shared_ptr<Mesh> getFSQuad();
 	unsigned char* getImageData(std::string fileanme, int& width, int& height, int& nChannels,int reqChannels= 0);

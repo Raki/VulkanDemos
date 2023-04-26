@@ -220,10 +220,174 @@ namespace VKUtility
 
 		return cubeMesh;
 	}
+	std::shared_ptr<Mesh> getCube(const glm::vec3 min, const glm::vec3 max)
+	{
+		const auto extent = max - min;
+		return getCube(extent.x, extent.y, extent.z);
+	}
 	std::shared_ptr<Mesh> getCubeOutline(glm::vec3 min, glm::vec3 max)
 	{
 		auto extent = max - min;
-		return getCube(extent.x,extent.y,extent.z);
+		const auto width = extent.x;
+		const auto height = extent.y;
+		const auto depth = extent.z;
+
+		
+		glm::vec3 bbMin, bbMax;
+		bbMax.x = width / 2;
+		bbMax.y = height / 2;
+		bbMax.z = depth / 2;
+		bbMin.x = -width / 2;
+		bbMin.y = -height / 2;
+		bbMin.z = -depth / 2;
+
+
+		std::vector<glm::vec3> vArr, nArr;
+		std::vector<glm::vec2> uvArr;
+
+		//top
+		glm::vec3 t1 = glm::vec3(bbMin.x, bbMax.y, bbMin.z);
+		glm::vec3 t2 = glm::vec3(bbMax.x, bbMax.y, bbMin.z);
+		glm::vec3 t3 = glm::vec3(bbMax.x, bbMax.y, bbMax.z);
+		glm::vec3 t4 = glm::vec3(bbMin.x, bbMax.y, bbMax.z);
+
+		//bottom
+		glm::vec3 b1 = glm::vec3(bbMin.x, bbMin.y, bbMin.z);
+		glm::vec3 b2 = glm::vec3(bbMax.x, bbMin.y, bbMin.z);
+		glm::vec3 b3 = glm::vec3(bbMax.x, bbMin.y, bbMax.z);
+		glm::vec3 b4 = glm::vec3(bbMin.x, bbMin.y, bbMax.z);
+
+		// front			back
+		//		t4--t3			t2--t1
+		//		|    |			|	|
+		//		b4--b3			b2--b1
+		// left			right
+		//		t1--t4			t3--t2
+		//		|    |			|	|
+		//		b1--b4			b3--b2
+		// top			bottom
+		//		t1--t2			b4--b3
+		//		|    |			|	|
+		//		t4--t3			b1--b2
+		//front
+		vArr.push_back(b4);		vArr.push_back(b3);		
+		vArr.push_back(b3);		vArr.push_back(t3);
+		vArr.push_back(t3);		vArr.push_back(t4);
+		vArr.push_back(t4);		vArr.push_back(b4);	
+		{
+			auto n = getNormal(b4, b3, t3);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+		}
+
+
+		//back
+		vArr.push_back(b2);		vArr.push_back(b1);
+		vArr.push_back(b1);		vArr.push_back(t1);
+		vArr.push_back(t1);		vArr.push_back(t2);
+		vArr.push_back(t2);		vArr.push_back(b2);
+		{
+			auto n = getNormal(b2, b1, t1);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+		}
+
+		//left
+		vArr.push_back(b1);		vArr.push_back(b4);
+		vArr.push_back(b4);		vArr.push_back(t4);
+		vArr.push_back(t4);		vArr.push_back(t1);
+		vArr.push_back(t1);		vArr.push_back(b1);
+		{
+			auto n = getNormal(b1, b4, t4);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+		}
+
+		//right
+		vArr.push_back(b3);		vArr.push_back(b2);
+		vArr.push_back(b2);		vArr.push_back(t2);
+		vArr.push_back(t2);		vArr.push_back(t3);
+		vArr.push_back(t3);		vArr.push_back(b3);
+		{
+			auto n = getNormal(b3, b2, t2);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+		}
+
+		//top
+		vArr.push_back(t4);		vArr.push_back(t3);
+		vArr.push_back(t3);		vArr.push_back(t2);
+		vArr.push_back(t2);		vArr.push_back(t1);
+		vArr.push_back(t1);		vArr.push_back(t4);
+		{
+			auto n = getNormal(t4, t3, t2);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+		}
+
+		//bottom
+		vArr.push_back(b1);		vArr.push_back(b2);
+		vArr.push_back(b2);		vArr.push_back(b3);
+		vArr.push_back(b3);		vArr.push_back(b4);
+		vArr.push_back(b4);		vArr.push_back(b1);
+		{
+			auto n = getNormal(b1, b2, b3);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+			nArr.push_back(n);
+		}
+
+		std::vector<VDPosNorm> interleavedArr;
+		std::vector<uint16_t> iArr;
+
+		auto totalVerts = vArr.size();
+		for (auto i = 0; i < totalVerts; i++)
+		{
+			auto v = vArr.at(i);
+			auto n = nArr.at(i);
+			interleavedArr.push_back({ v,n });
+			iArr.push_back((uint16_t)iArr.size());
+		}
+
+		auto cubeMesh = std::make_shared<Mesh>(interleavedArr, iArr);
+		cubeMesh->name = "Cube Mesh";
+
+		return cubeMesh;
 	}
 	std::shared_ptr<Mesh> getFSQuad()
 	{
@@ -305,6 +469,13 @@ namespace VKUtility
 		this->vData = vData;
 		this->iData = iData;
 	}
+
+	Mesh::Mesh(std::vector<VDPosNorm> vData, std::vector<uint16_t> iData)
+	{
+		this->vDataOL = vData;
+		this->iData = iData;
+	}
+
 	VDPosNorm::VDPosNorm(glm::vec3 pos, glm::vec3 norm)
 	{
 		position = pos;
