@@ -232,7 +232,7 @@ struct VKMesh
     }
 };
 
-struct VKMesh3D : VKMesh
+struct VKMesh3D : public VKMesh
 {
     std::vector<VKUtility::VDPosNorm> vertices;
     void createBuffers(VkDevice device)
@@ -280,6 +280,11 @@ struct VKMesh3D : VKMesh
         vkDestroyBuffer(device, iStageBuff, nullptr);
         vkFreeMemory(device, iStageBuffMemory, nullptr);
     }
+
+    void createBuffNonInterleaved(const VkDevice& device)  
+    {
+        fmt::print("override called");
+    }
 };
 
 struct PushConstant
@@ -325,6 +330,17 @@ struct Descriptor
     std::shared_ptr<Image> image;
 };
 
+struct DescSetBuildResult
+{
+    std::vector<Descriptor> descriptors;
+    std::vector<VkDescriptorSet> descSets;
+    VkDescriptorSetLayout descSetLayout;
+    std::vector<VkVertexInputAttributeDescription> vertIPAttribDesc;
+    std::vector<VkVertexInputBindingDescription> vertIPBindDesc;
+    VkShaderModule triangleVS;
+    VkShaderModule triangleFS;
+};
+
 Buffer uboFrag,uboVert;
 UBOFrag lightInfo;
 //std::vector<VkBuffer> uniformBuffers;
@@ -346,8 +362,8 @@ std::vector<std::shared_ptr<VKMesh>> cubes,wireFrameObjs;
 std::chrono::system_clock::time_point lastTime{};
 
 std::shared_ptr<VKBackend::VKTexture> texture,redTexture;
-std::vector<Descriptor> descriptors;
-std::vector<VkDescriptorSet> testDescriptorSets;
+std::vector<Descriptor> descriptors, descriptorsFlat;
+std::vector<VkDescriptorSet> descriptorSetsFlat;
 
 struct FiveColors
 {
@@ -407,6 +423,7 @@ uint rootNodeIdx = 0, nodesUsed = 1;
 #pragma region prototypes
 void createWindow();
 void initVulkan();
+void buildDescriptorsFor(std::string fsPath, std::string vsPath,DescSetBuildResult &result, std::shared_ptr<Image> image=nullptr);
 void updateFrame();
 void compileShaders();
 void destroyVulkan();
@@ -415,6 +432,7 @@ VkSurfaceKHR createSurface(GLFWwindow* window, VkInstance instace);
 void createUniformBuffers();
 void createDescriptorSets(const VkDevice device, const std::vector<Descriptor>& descriptors);
 void createDescriptorSets(const VkDevice device, const std::vector<Descriptor>& descriptors,std::vector<VkDescriptorSet> &descSets);
+void createDescriptorSets(const VkDevice device, const std::vector<Descriptor>& descriptors, std::vector<VkDescriptorSet>& descSets,VkDescriptorSetLayout descLayout);
 void createPipelineCache(const VkDevice device);
 VkPipeline createGraphicsPipeline(VkDevice device, VkRenderPass renderPass, VkShaderModule vsModule, VkShaderModule fsModule);
 //ToDo: Any chance to improve this?
@@ -519,21 +537,81 @@ void initVulkan()
     VKBackend::commandPool = VKBackend::createCommandPool(VKBackend::device);
     VKBackend::createCommandBuffers(VKBackend::device, VKBackend::commandPool);
 
+    createUniformBuffers();
 
-    auto vsFileContent = Utility::readBinaryFileContents(VERT_SHADER_SPV);
-    auto fsFileContent = Utility::readBinaryFileContents(FRAG_SHADER_SPV);
+    // create descriptor pool
+    std::vector<VkDescriptorPoolSize> poolsizes;
 
-    auto triangleVS = VKBackend::loadShader(VKBackend::device, vsFileContent);
-    assert(triangleVS);
-    auto triangleFS = VKBackend::loadShader(VKBackend::device, fsFileContent);
-    assert(triangleFS);
+    {
+        VkDescriptorPoolSize poolSize;
+        poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        //why x10?
+        poolSize.descriptorCount = static_cast<uint32_t>(VKBackend::swapchainMinImageCount * 10);
+        poolsizes.push_back(poolSize);
+        poolsizes.push_back(poolSize);
+    }
+    {
+        VkDescriptorPoolSize poolSize;
+        poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        //why x10?
+        poolSize.descriptorCount = static_cast<uint32_t>(VKBackend::swapchainMinImageCount * 10);
+        poolsizes.push_back(poolSize);
+    }
+    VKBackend::createDescriptorPool(VKBackend::device, poolsizes);
+
+    texture = VKBackend::createVKTexture("img/sample.jpg");
+
+    auto image = std::make_shared<Image>();
+    image->texContainer = texture;
+    VkDescriptorImageInfo imageInfo{};
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    imageInfo.imageView = texture->textureImageView;
+    imageInfo.sampler = texture->textureSampler;
+    image->imageInfo = imageInfo;
+
+
+    DescSetBuildResult result;
+
+    buildDescriptorsFor(FRAG_SHADER_SPV, VERT_SHADER_SPV, result, image);
+
+    VKBackend::descriptorSetLayout = result.descSetLayout;
+    VKBackend::descriptorSets = result.descSets;
+    descriptors = result.descriptors;
+
+
+    createPipelineCache(VKBackend::device);
+    VKBackend::graphicsPipeline = createGraphicsPipeline(VKBackend::device,pipelineCache, VKBackend::renderPass, result.triangleVS, result.triangleFS,
+        result.vertIPAttribDesc,result.vertIPBindDesc);
+
+    vkDestroyShaderModule(VKBackend::device, result.triangleVS, nullptr);
+    vkDestroyShaderModule(VKBackend::device, result.triangleFS, nullptr);
+
+    createColorResource();
+    createDepthResources();
+    createFramebuffers();
+
+    VKBackend::createSyncObjects();
+
+    setupScene();
+    
+}
+//ToDo :  make this function generic and move to VKBackend
+void buildDescriptorsFor(const std::string fsPath,const std::string vsPath, DescSetBuildResult& result,std::shared_ptr<Image> image)
+{
+    const auto vsFileContent = Utility::readBinaryFileContents(vsPath);
+    const auto fsFileContent = Utility::readBinaryFileContents(fsPath);
+
+    result.triangleVS = VKBackend::loadShader(VKBackend::device, vsFileContent);
+    assert(result.triangleVS);
+    result.triangleFS = VKBackend::loadShader(VKBackend::device, fsFileContent);
+    assert(result.triangleFS);
 
     auto setsV = VKBackend::getDescriptorSetLayoutDataFromSpv(vsFileContent);
     auto setsF = VKBackend::getDescriptorSetLayoutDataFromSpv(fsFileContent);
 
-    std::vector<VkVertexInputAttributeDescription> vertIPAttribDesc;
-    std::vector<VkVertexInputBindingDescription> vertIPBindDesc;
-    VKBackend::getInputInfoFromSpv(vsFileContent, vertIPAttribDesc, vertIPBindDesc,false);
+    //std::vector<VkVertexInputAttributeDescription> vertIPAttribDesc;
+    //std::vector<VkVertexInputBindingDescription> vertIPBindDesc;
+    VKBackend::getInputInfoFromSpv(vsFileContent, result.vertIPAttribDesc, result.vertIPBindDesc, false);
 
     std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
 
@@ -547,87 +625,34 @@ void initVulkan()
         layoutBindings.insert(layoutBindings.end(), set.bindings.begin(), set.bindings.end());
     }
 
-    
-    
-    VKBackend::createDescriptorSetLayout(layoutBindings);
-    
-    createUniformBuffers();
+    result.descSetLayout = VKBackend::getDescriptorSetLayout(layoutBindings);
 
-    std::vector<VkDescriptorPoolSize> poolsizes;
-
-    for (const auto& descLayoutBinding : layoutBindings)
-    {
-        VkDescriptorPoolSize poolSize;
-        poolSize.type = descLayoutBinding.descriptorType;
-        //why x10?
-        poolSize.descriptorCount = static_cast<uint32_t>(VKBackend::swapchainMinImageCount*10);
-        poolsizes.push_back(poolSize);
-    }
-
-    VKBackend::createDescriptorPool(VKBackend::device,poolsizes);
-
-    texture = VKBackend::createVKTexture("img/sample.jpg");
-    //redTexture = VKBackend::createVKTexture("img/red.jpg");
-
-    auto image = std::make_shared<Image>();
-    image->texContainer = texture;
-    VkDescriptorImageInfo imageInfo{};
-    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    imageInfo.imageView = texture->textureImageView;
-    imageInfo.sampler = texture->textureSampler;
-    image->imageInfo = imageInfo;
-
-    /*auto imageRed = std::make_shared<Image>();
-    imageRed->texContainer = redTexture;
-    VkDescriptorImageInfo redImageInfo{};
-    redImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    redImageInfo.imageView = redTexture->textureImageView;
-    redImageInfo.sampler = redTexture->textureSampler;
-    imageRed->imageInfo = redImageInfo;*/
-    
-    for (size_t l=0;l<layoutBindings.size();l++)
+    for (size_t l = 0; l < layoutBindings.size(); l++)
     {
         auto lb = layoutBindings.at(l);
         Descriptor descriptor;
         switch (lb.binding)
         {
-            case 0: // v shader ubo
-                descriptor.buffer = std::make_shared<Buffer>(uboVert);
-                descriptor.layout = lb;
-                break;
-            case 1: // f shader ubo
-                descriptor.buffer = std::make_shared<Buffer>(uboFrag);
-                descriptor.layout = lb;
-                break;
-            case 2: // f shader sampler
-                descriptor.image = image;
-                descriptor.layout = lb;
-                break;
-            default:
-                assert(false);
+        case 0: // v shader ubo
+            descriptor.buffer = std::make_shared<Buffer>(uboVert);
+            descriptor.layout = lb;
+            break;
+        case 1: // f shader ubo
+            descriptor.buffer = std::make_shared<Buffer>(uboFrag);
+            descriptor.layout = lb;
+            break;
+        case 2: // f shader sampler
+            descriptor.image = image;
+            descriptor.layout = lb;
+            break;
+        default:
+            assert(false);
         }
 
-        descriptors.push_back(descriptor);
+        result.descriptors.push_back(descriptor);
     }
-
-    //createDescriptorSets(VKBackend::device,descriptors);
-    createDescriptorSets(VKBackend::device, descriptors,VKBackend::descriptorSets);
-
-    createPipelineCache(VKBackend::device);
-    VKBackend::graphicsPipeline = createGraphicsPipeline(VKBackend::device,pipelineCache, VKBackend::renderPass, triangleVS, triangleFS,
-        vertIPAttribDesc,vertIPBindDesc);
-
-    vkDestroyShaderModule(VKBackend::device, triangleVS, nullptr);
-    vkDestroyShaderModule(VKBackend::device, triangleFS, nullptr);
-
-    createColorResource();
-    createDepthResources();
-    createFramebuffers();
-
-    VKBackend::createSyncObjects();
-
-    setupScene();
     
+    createDescriptorSets(VKBackend::device, result.descriptors, result.descSets, result.descSetLayout);
 }
 void updateFrame()
 {
@@ -838,6 +863,50 @@ void createDescriptorSets(const VkDevice device, const std::vector<Descriptor>& 
 void createDescriptorSets(const VkDevice device, const std::vector<Descriptor>& descriptors, std::vector<VkDescriptorSet>& descSets)
 {
     std::vector<VkDescriptorSetLayout> layouts(VKBackend::swapchainMinImageCount, VKBackend::descriptorSetLayout);
+    VkDescriptorSetAllocateInfo allocateInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+    allocateInfo.descriptorPool = VKBackend::descriptorPool;
+    allocateInfo.descriptorSetCount = static_cast<uint32_t>(3);
+    allocateInfo.pSetLayouts = layouts.data();;
+
+    descSets.resize(VKBackend::swapchainMinImageCount);
+
+    if (vkAllocateDescriptorSets(device, &allocateInfo, descSets.data()) != VK_SUCCESS)
+    {
+        throw std::runtime_error("failed to allocate descriptor sets!");
+    }
+
+    for (size_t i = 0; i < VKBackend::swapchainMinImageCount; i++)
+    {
+        std::vector<VkWriteDescriptorSet> descriptorWrites(descriptors.size());
+
+        for (size_t d = 0; d < descriptors.size(); d++)
+        {
+            descriptorWrites.at(d).sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites.at(d).dstSet = descSets[i];
+            descriptorWrites.at(d).dstBinding = descriptors.at(d).layout.binding;
+            descriptorWrites.at(d).dstArrayElement = 0;
+            descriptorWrites.at(d).descriptorType = descriptors.at(d).layout.descriptorType;
+            descriptorWrites.at(d).descriptorCount = descriptors.at(d).layout.descriptorCount;
+            if (descriptors.at(d).layout.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+            {
+                descriptors.at(d).buffer->bufferInfo.at(i).buffer = descriptors.at(d).buffer->uniformBuffers.at(i);
+                descriptors.at(d).buffer->bufferInfo.at(i).offset = 0;
+                descriptors.at(d).buffer->bufferInfo.at(i).range = descriptors.at(d).buffer->range;
+                descriptorWrites.at(d).pBufferInfo = &descriptors.at(d).buffer->bufferInfo.at(i);
+            }
+            else if (descriptors.at(d).layout.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+            {
+                descriptorWrites.at(d).pImageInfo = &descriptors.at(d).image->imageInfo;
+            }
+
+        }
+
+        vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+    }
+}
+void createDescriptorSets(const VkDevice device, const std::vector<Descriptor>& descriptors, std::vector<VkDescriptorSet>& descSets, VkDescriptorSetLayout descLayout)
+{
+    std::vector<VkDescriptorSetLayout> layouts(VKBackend::swapchainMinImageCount, descLayout);
     VkDescriptorSetAllocateInfo allocateInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
     allocateInfo.descriptorPool = VKBackend::descriptorPool;
     allocateInfo.descriptorSetCount = static_cast<uint32_t>(3);
