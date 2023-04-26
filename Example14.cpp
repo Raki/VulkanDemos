@@ -355,7 +355,7 @@ VkImageView depthImageView;
 
 VkPipelineCache pipelineCache;
 VkPipeline wireframePipeline=VK_NULL_HANDLE;
-
+VkPipelineLayout wireframePipelineLayout;
 
 std::shared_ptr<VKBackend::VKRenderTarget> msColorAttch;
 std::vector<std::shared_ptr<VKMesh>> cubes,wireFrameObjs;
@@ -595,15 +595,17 @@ void initVulkan()
 
     std::vector<VkPushConstantRange> pushConstants = { pushConstant };
     std::vector<VkDescriptorSetLayout> descriptorLayouts = { VKBackend::descriptorSetLayout };
+    std::vector<VkDescriptorSetLayout> descriptorLayoutsWF = { descLayoutFlat };
 
     VKBackend::pipelineLayout = VKBackend::createPipelineLayout(descriptorLayouts, pushConstants);
+    wireframePipelineLayout = VKBackend::createPipelineLayout(descriptorLayoutsWF, pushConstants);
 
     createPipelineCache(VKBackend::device);
     VKBackend::graphicsPipeline = createGraphicsPipeline(VKBackend::device,pipelineCache, VKBackend::renderPass, result.triangleVS, result.triangleFS,
         result.vertIPAttribDesc,result.vertIPBindDesc, VKBackend::pipelineLayout,VK_POLYGON_MODE_FILL);
 
-    wireframePipeline = createGraphicsPipeline(VKBackend::device, pipelineCache, VKBackend::renderPass, result.triangleVS, result.triangleFS,
-        result.vertIPAttribDesc, result.vertIPBindDesc, VKBackend::pipelineLayout,VK_POLYGON_MODE_LINE);
+    wireframePipeline = createGraphicsPipeline(VKBackend::device, pipelineCache, VKBackend::renderPass, resultFlat.triangleVS, resultFlat.triangleFS,
+        resultFlat.vertIPAttribDesc, resultFlat.vertIPBindDesc, wireframePipelineLayout,VK_POLYGON_MODE_LINE);
 
     vkDestroyShaderModule(VKBackend::device, result.triangleVS, nullptr);
     vkDestroyShaderModule(VKBackend::device, result.triangleFS, nullptr);
@@ -724,6 +726,7 @@ void destroyVulkan()
 
     vkDestroyPipeline(VKBackend::device, VKBackend::graphicsPipeline, nullptr);
     vkDestroyPipelineLayout(VKBackend::device, VKBackend::pipelineLayout, nullptr);
+    vkDestroyPipelineLayout(VKBackend::device, wireframePipelineLayout, nullptr);
     vkDestroyRenderPass(VKBackend::device, VKBackend::renderPass, nullptr);
 
     for (auto imageView : VKBackend::swapChainImageViews) {
@@ -1230,6 +1233,7 @@ void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex)
 
 
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, wireframePipeline);
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, wireframePipelineLayout, 0, 1, &descriptorSetsFlat[imageIndex], 0, nullptr);
     for (const auto& shape : wireFrameObjs)
     {
         //std::shared_ptr<VKMesh3D> shape = cube;
@@ -1245,10 +1249,10 @@ void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex)
         {
             vertexBuffers.push_back(shape->posBuffer);
             vertexBuffers.push_back(shape->normBuffer);
-            vertexBuffers.push_back(shape->uvBuffer);
+            //vertexBuffers.push_back(shape->uvBuffer);
             offsets.push_back(0);
             offsets.push_back(0);
-            offsets.push_back(0);
+            //offsets.push_back(0);
         }
 
 
