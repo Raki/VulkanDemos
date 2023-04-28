@@ -44,7 +44,7 @@ namespace VKBackend
 
 	VkInstance createVulkanInstance()
 	{
-		VkInstance vkInstance;
+		VkInstance lVkInstance;
 		//Warn : In real world application need to check availability of
 		// version using vkEnumerateInstanceVersion
 		VkApplicationInfo appInfo = {};
@@ -83,9 +83,9 @@ namespace VKBackend
 		vkInstCreateInfo.ppEnabledExtensionNames = extensions;
 		vkInstCreateInfo.enabledExtensionCount = sizeof(extensions) / sizeof(extensions[0]);
 
-		VK_CHECK(vkCreateInstance(&vkInstCreateInfo, 0, &vkInstance));
+		VK_CHECK(vkCreateInstance(&vkInstCreateInfo, 0, &lVkInstance));
 
-		return vkInstance;
+		return lVkInstance;
 	}
 	VkPhysicalDevice pickPhysicalDevice(VkInstance instance)
 	{

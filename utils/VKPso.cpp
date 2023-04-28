@@ -5,7 +5,7 @@ VKPso::VKPso()
 	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 }
 
-VKPso& VKPso::addShaderModules(VkShaderModule vsModule, VkShaderModule fsModule)
+VKPso& VKPso::addShaderModules(const VkShaderModule vsModule,const VkShaderModule fsModule)
 {
 	// TODO: What if the pipeline has more stages ?
 	//VkPipelineShaderStageCreateInfo stages[2] = {};
@@ -19,49 +19,49 @@ VKPso& VKPso::addShaderModules(VkShaderModule vsModule, VkShaderModule fsModule)
 	return *this;
 }
 
-VKPso& VKPso::addPipelineVertexInputState(VkPipelineVertexInputStateCreateInfo cInfo)
+VKPso& VKPso::addPipelineVertexInputState(const VkPipelineVertexInputStateCreateInfo cInfo)
 {
 	pipelineInfo.pVertexInputState = &cInfo;
 	return *this;
 }
 
-VKPso& VKPso::addPipelineInputAssemblyState(VkPipelineInputAssemblyStateCreateInfo cInfo)
+VKPso& VKPso::addPipelineInputAssemblyState(const VkPipelineInputAssemblyStateCreateInfo cInfo)
 {
 	pipelineInfo.pInputAssemblyState = &cInfo;
 	return *this;
 }
 
-VKPso& VKPso::addPipelineViewportState(VkPipelineViewportStateCreateInfo cInfo)
+VKPso& VKPso::addPipelineViewportState(const VkPipelineViewportStateCreateInfo cInfo)
 {
 	pipelineInfo.pViewportState = &cInfo;
 	return *this;
 }
 
-VKPso& VKPso::addPipelineRasterState(VkPipelineRasterizationStateCreateInfo cInfo)
+VKPso& VKPso::addPipelineRasterState(const VkPipelineRasterizationStateCreateInfo cInfo)
 {
 	pipelineInfo.pRasterizationState = &cInfo;
 	return *this;
 }
 
-VKPso& VKPso::addPipelineMultisampleState(VkPipelineMultisampleStateCreateInfo cInfo)
+VKPso& VKPso::addPipelineMultisampleState(const VkPipelineMultisampleStateCreateInfo cInfo)
 {
 	pipelineInfo.pMultisampleState = &cInfo;
 	return *this;
 }
 
-VKPso& VKPso::addPipelineColorBlendState(VkPipelineColorBlendStateCreateInfo cInfo)
+VKPso& VKPso::addPipelineColorBlendState(const VkPipelineColorBlendStateCreateInfo cInfo)
 {
 	pipelineInfo.pColorBlendState = &cInfo;
 	return *this;
 }
 
-VKPso& VKPso::addPipelineDynamicState(VkPipelineDynamicStateCreateInfo cInfo)
+VKPso& VKPso::addPipelineDynamicState(const VkPipelineDynamicStateCreateInfo cInfo)
 {
 	pipelineInfo.pDynamicState = &cInfo;
 	return *this;
 }
 
-VKPso& VKPso::addPipelineDepthStencilState(VkPipelineDepthStencilStateCreateInfo cInfo)
+VKPso& VKPso::addPipelineDepthStencilState(const VkPipelineDepthStencilStateCreateInfo cInfo)
 {
 	pipelineInfo.pDepthStencilState = &cInfo;
 	return *this;
@@ -91,7 +91,7 @@ VKPso& VKPso::addBasePipelineHandle(const VkPipeline pipeline)
 	return *this;
 }
 
-VkPipeline VKPso::build(const VkDevice device, const VkPipelineCache pipelineCache)
+VkPipeline VKPso::build(const VkDevice device, const VkPipelineCache pipelineCache) const
 {
 	assert(device!=VK_NULL_HANDLE);
 

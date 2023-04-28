@@ -446,8 +446,6 @@ struct DescSetBuildResult
 
 Buffer uboFrag,uboVert;
 UBOFrag lightInfo;
-//std::vector<VkBuffer> uniformBuffers;
-//std::vector<VkDeviceMemory> uniformBufferMemories;
 
 std::vector<VKUtility::Vertex> vertices;
 std::vector<uint16_t> indices;
@@ -549,15 +547,15 @@ inline void swap(uint& v1, uint& v2);
 #pragma endregion prototypes
 
 #pragma region functions
-static void error_callback(int error, const char* description)
+static void error_callback(int error, const char* description) 
 {
-    fmt::print(stderr, "Error: {}\n", description);
+    fmt::print(stderr, "{} Error: {}\n",error, description);
 }
 
-static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+static void key_callback(GLFWwindow* windw, int key, int scancode, int action, int mods)
 {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
-        glfwSetWindowShouldClose(window, GLFW_TRUE);
+        glfwSetWindowShouldClose(windw, GLFW_TRUE);
     else if (key == GLFW_KEY_LEFT && action == GLFW_PRESS)
     {
         lightInfo.position.x -= 1;
@@ -601,16 +599,16 @@ void initVulkan()
     VKBackend::physicalDevice = VKBackend::pickPhysicalDevice(VKBackend::vkInstance);
     assert(VKBackend::physicalDevice);
 
-    auto queFamilyIndices = VKBackend::pickDeviceQueueFamily(VKBackend::physicalDevice, VKBackend::surface);
+    const auto queFamilyIndices = VKBackend::pickDeviceQueueFamily(VKBackend::physicalDevice, VKBackend::surface);
 
-    bool bindlessResources = VKBackend::supportForDescriptorIndexing(VKBackend::physicalDevice);
+    const bool bindlessResources = VKBackend::supportForDescriptorIndexing(VKBackend::physicalDevice);
 
     if(bindlessResources)
         fmt::print("GPU supports descriptor indexing\n");
 
     VKBackend::device = VKBackend::createDevice(VKBackend::physicalDevice);
 
-    auto swapChainSupportDetails = VKBackend::querySwapChainSupport(VKBackend::physicalDevice);
+    const auto swapChainSupportDetails = VKBackend::querySwapChainSupport(VKBackend::physicalDevice);
 
     VKBackend::swapchain = VKBackend::createSwapchain(VKBackend::device, VKBackend::surface);
 
@@ -645,7 +643,7 @@ void initVulkan()
 
     texture = VKBackend::createVKTexture("img/sample.jpg");
 
-    auto image = std::make_shared<Image>();
+    const auto image = std::make_shared<Image>();
     image->texContainer = texture;
     VkDescriptorImageInfo imageInfo{};
     imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -762,8 +760,6 @@ void buildDescriptorsFor(const std::string fsPath,const std::string vsPath, Desc
     auto setsV = VKBackend::getDescriptorSetLayoutDataFromSpv(vsFileContent);
     auto setsF = VKBackend::getDescriptorSetLayoutDataFromSpv(fsFileContent);
 
-    //std::vector<VkVertexInputAttributeDescription> vertIPAttribDesc;
-    //std::vector<VkVertexInputBindingDescription> vertIPBindDesc;
     VKBackend::getInputInfoFromSpv(vsFileContent, result.vertIPAttribDesc, result.vertIPBindDesc, false);
 
     std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
@@ -817,7 +813,7 @@ void updateFrame()
     
    
 }
-void compileShaders()
+void compileShaders() 
 {
     //ToDo : Compile only file content is changed
     auto res = system("glslangValidator.exe -V ./shaders/simpleMat.frag.glsl -o ./shaders/simpleMat.frag.spv");
@@ -938,10 +934,10 @@ void destroyVulkan()
     vkDestroySurfaceKHR(VKBackend::vkInstance, VKBackend::surface, nullptr);
     vkDestroyInstance(VKBackend::vkInstance,nullptr);
 }
-VkSurfaceKHR createSurface(GLFWwindow* window, VkInstance instance)
+VkSurfaceKHR createSurface(GLFWwindow* windw, VkInstance instance)
 {
     VkSurfaceKHR surface;
-    glfwCreateWindowSurface(instance, window, nullptr, &surface);
+    glfwCreateWindowSurface(instance, windw, nullptr, &surface);
     return surface;
 }
 void createUniformBuffers()
@@ -971,7 +967,7 @@ void createUniformBuffers()
        uboFrag.bufferInfo.at(i).range = uboFrag.range;
     }
 }
-void createDescriptorSets(const VkDevice device, const std::vector<Descriptor>& descriptors, std::vector<VkDescriptorSet>& descSets, VkDescriptorSetLayout descLayout)
+void createDescriptorSets(const VkDevice device, const std::vector<Descriptor>& lDescriptors, std::vector<VkDescriptorSet>& descSets, VkDescriptorSetLayout descLayout)
 {
     std::vector<VkDescriptorSetLayout> layouts(VKBackend::swapchainMinImageCount, descLayout);
     VkDescriptorSetAllocateInfo allocateInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
@@ -988,26 +984,26 @@ void createDescriptorSets(const VkDevice device, const std::vector<Descriptor>& 
 
     for (size_t i = 0; i < VKBackend::swapchainMinImageCount; i++)
     {
-        std::vector<VkWriteDescriptorSet> descriptorWrites(descriptors.size());
+        std::vector<VkWriteDescriptorSet> descriptorWrites(lDescriptors.size());
 
-        for (size_t d = 0; d < descriptors.size(); d++)
+        for (size_t d = 0; d < lDescriptors.size(); d++)
         {
             descriptorWrites.at(d).sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             descriptorWrites.at(d).dstSet = descSets[i];
-            descriptorWrites.at(d).dstBinding = descriptors.at(d).layout.binding;
+            descriptorWrites.at(d).dstBinding = lDescriptors.at(d).layout.binding;
             descriptorWrites.at(d).dstArrayElement = 0;
-            descriptorWrites.at(d).descriptorType = descriptors.at(d).layout.descriptorType;
-            descriptorWrites.at(d).descriptorCount = descriptors.at(d).layout.descriptorCount;
-            if (descriptors.at(d).layout.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+            descriptorWrites.at(d).descriptorType = lDescriptors.at(d).layout.descriptorType;
+            descriptorWrites.at(d).descriptorCount = lDescriptors.at(d).layout.descriptorCount;
+            if (lDescriptors.at(d).layout.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
             {
-                descriptors.at(d).buffer->bufferInfo.at(i).buffer = descriptors.at(d).buffer->uniformBuffers.at(i);
-                descriptors.at(d).buffer->bufferInfo.at(i).offset = 0;
-                descriptors.at(d).buffer->bufferInfo.at(i).range = descriptors.at(d).buffer->range;
-                descriptorWrites.at(d).pBufferInfo = &descriptors.at(d).buffer->bufferInfo.at(i);
+                lDescriptors.at(d).buffer->bufferInfo.at(i).buffer = lDescriptors.at(d).buffer->uniformBuffers.at(i);
+                lDescriptors.at(d).buffer->bufferInfo.at(i).offset = 0;
+                lDescriptors.at(d).buffer->bufferInfo.at(i).range = lDescriptors.at(d).buffer->range;
+                descriptorWrites.at(d).pBufferInfo = &lDescriptors.at(d).buffer->bufferInfo.at(i);
             }
-            else if (descriptors.at(d).layout.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+            else if (lDescriptors.at(d).layout.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
             {
-                descriptorWrites.at(d).pImageInfo = &descriptors.at(d).image->imageInfo;
+                descriptorWrites.at(d).pImageInfo = &lDescriptors.at(d).image->imageInfo;
             }
 
         }
@@ -1236,7 +1232,7 @@ void createColorResource()
     msColorAttch->colorImageView = VKBackend::createImageView(msColorAttch->colorImage, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT);
 }
 
-void fillCube(float width, float height, float depth,glm::mat4 tMat, std::vector<VKUtility::VDPosNorm>& verts, std::vector<uint16_t>& indices)
+void fillCube(float width, float height, float depth,glm::mat4 tMat, std::vector<VKUtility::VDPosNorm>& verts, std::vector<uint16_t>& lIndices)
 {
     auto hasTex = true;
     glm::vec3 bbMin, bbMax;
@@ -1439,7 +1435,7 @@ void fillCube(float width, float height, float depth,glm::mat4 tMat, std::vector
         auto n = glm::normalize(nArr.at(i));
         auto uv = uvArr.at(i);
         verts.push_back({ v,n });
-        indices.push_back((uint16_t)indices.size());
+        lIndices.push_back((uint16_t)lIndices.size());
     }
    
 }
@@ -1597,14 +1593,14 @@ void loadGlbModel(std::string filePath)
             auto& mesh = model.meshes[node.mesh];
             if (mesh.primitives.size() > 0)
             {
-                auto& primitive = mesh.primitives.at(0);
-                auto& posAccrInd = primitive.attributes["POSITION"];
-                auto& nrmAccrInd = primitive.attributes["NORMAL"];
-                auto& uvAccrInd = primitive.attributes["TEXCOORD_0"];
+                //auto& primitive = mesh.primitives.at(0);
+                //auto& posAccrInd = primitive.attributes["POSITION"];
+                //auto& nrmAccrInd = primitive.attributes["NORMAL"];
+                //auto& uvAccrInd = primitive.attributes["TEXCOORD_0"];
 
-                auto& posAccr = model.accessors.at(posAccrInd);
-                auto& posBuffView = model.bufferViews.at(posAccr.bufferView);
-                auto& posBuff = model.buffers.at(posBuffView.buffer);
+                //auto& posAccr = model.accessors.at(posAccrInd);
+                //auto& posBuffView = model.bufferViews.at(posAccr.bufferView);
+                //auto& posBuff = model.buffers.at(posBuffView.buffer);
                 
             }
         }
@@ -1679,7 +1675,7 @@ void subdivide(uint nodeIdx)
     }
 
     int leftCount = i - node.leftFirst;
-    if (leftCount == 0 || leftCount == node.triCount) return;
+    if (leftCount == 0 || leftCount == static_cast<int>(node.triCount)) return;
     // create child nodes
     int leftChildIdx = nodesUsed++;
     int rightChildIdx = nodesUsed++;
