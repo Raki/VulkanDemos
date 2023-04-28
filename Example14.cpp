@@ -3,6 +3,7 @@
 #include "VKUtility.h"
 #include "VKBackend.h"
 #include "Colors.h"
+#include "VKPso.h"
 #include <imgui.h>
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_vulkan.h"
@@ -521,13 +522,6 @@ VkSurfaceKHR createSurface(GLFWwindow* window, VkInstance instace);
 void createUniformBuffers();
 void createDescriptorSets(const VkDevice device, const std::vector<Descriptor>& descriptors, std::vector<VkDescriptorSet>& descSets,VkDescriptorSetLayout descLayout);
 void createPipelineCache(const VkDevice device);
-//ToDo: Any chance to improve this?
-VkPipeline createGraphicsPipeline(VkDevice device,VkPipelineCache pipelineCache , VkRenderPass renderPass, VkShaderModule vsModule, VkShaderModule fsModule,
-    std::vector<VkVertexInputAttributeDescription>& vertIPAttribDesc, 
-    std::vector<VkVertexInputBindingDescription>& vertIPBindDesc,
-    const VkPipelineLayout pipelineLayout,
-    const VkPolygonMode polygonMode,
-    const VkPrimitiveTopology primToplogy);
 void createFramebuffers();
 void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
@@ -688,11 +682,56 @@ void initVulkan()
     wireframePipelineLayout = VKBackend::createPipelineLayout(descriptorLayoutsWF, pushConstants);
 
     createPipelineCache(VKBackend::device);
-    VKBackend::graphicsPipeline = createGraphicsPipeline(VKBackend::device,pipelineCache, VKBackend::renderPass, result.vsModule, result.fsModule,
-        result.vertIPAttribDesc,result.vertIPBindDesc, VKBackend::pipelineLayout,VK_POLYGON_MODE_FILL, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+    
+    VKPso pso;
+    {
+        auto vertexInputInfo = VKBackend::getPipelineVertexInputState(static_cast<uint32_t>(result.vertIPBindDesc.size()), result.vertIPBindDesc.data(), static_cast<uint32_t>(result.vertIPAttribDesc.size()),
+            result.vertIPAttribDesc.data());
+        auto inputAssembly = VKBackend::getPipelineInputAssemblyState(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_FALSE);
+        auto viewportState = VKBackend::getPipelineViewportState(1, 1);
+        auto rasterizer = VKBackend::getPipelineRasterState(VK_POLYGON_MODE_FILL, 1.0f);
+        auto multisampling = VKBackend::getPipelineMultisampleState(VK_FALSE, VKBackend::msaaSamples);
+        auto depthStencil = VKBackend::getPipelineDepthStencilState(VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS, VK_FALSE, 0.0f, 1.0f, VK_FALSE);
 
-    wireframePipeline = createGraphicsPipeline(VKBackend::device, pipelineCache, VKBackend::renderPass, resultFlat.vsModule, resultFlat.fsModule,
-        resultFlat.vertIPAttribDesc, resultFlat.vertIPBindDesc, wireframePipelineLayout,VK_POLYGON_MODE_LINE, VK_PRIMITIVE_TOPOLOGY_LINE_LIST);
+        VkPipelineColorBlendAttachmentState colorBlendAttachment = VKBackend::getPipelineColorBlendAttachState(VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT, VK_FALSE);
+        const float blendConsts[4] = { 0,0,0,0 };
+        auto colorBlending = VKBackend::getPipelineColorBlendState(VK_FALSE, VK_LOGIC_OP_COPY, 1, &colorBlendAttachment, blendConsts);
+
+        std::vector<VkDynamicState> dynamicStates = {
+            VK_DYNAMIC_STATE_VIEWPORT,
+            VK_DYNAMIC_STATE_SCISSOR
+        };
+        auto dynamicState = VKBackend::getPipelineDynamicState(dynamicStates);
+     
+        pso.addShaderModules(result.vsModule, result.fsModule);
+        pso.addPipelineVertexInputState(vertexInputInfo);
+        pso.addPipelineInputAssemblyState(inputAssembly);
+        pso.addPipelineViewportState(viewportState);
+        pso.addPipelineRasterState(rasterizer);
+        pso.addPipelineMultisampleState(multisampling);
+        pso.addPipelineDepthStencilState(depthStencil);
+        pso.addPipelineColorBlendState(colorBlending);
+        pso.addPipelineDynamicState(dynamicState);
+        pso.addPipelineLayout(VKBackend::pipelineLayout);
+        pso.addRenderpass(VKBackend::renderPass);
+        pso.addSubpass(0);
+        pso.addBasePipelineHandle(VK_NULL_HANDLE);
+        VKBackend::graphicsPipeline = pso.build(VKBackend::device,pipelineCache);
+
+        //wireframe pipline
+        vertexInputInfo = VKBackend::getPipelineVertexInputState(static_cast<uint32_t>(resultFlat.vertIPBindDesc.size()), resultFlat.vertIPBindDesc.data(), static_cast<uint32_t>(resultFlat.vertIPAttribDesc.size()),
+        resultFlat.vertIPAttribDesc.data());
+        inputAssembly = VKBackend::getPipelineInputAssemblyState(VK_PRIMITIVE_TOPOLOGY_LINE_LIST, VK_FALSE);
+        rasterizer = VKBackend::getPipelineRasterState(VK_POLYGON_MODE_LINE, 1.0f);
+     
+        pso.addShaderModules(resultFlat.vsModule, resultFlat.fsModule);
+        pso.addPipelineVertexInputState(vertexInputInfo);
+        pso.addPipelineInputAssemblyState(inputAssembly);
+        pso.addPipelineRasterState(rasterizer);
+        pso.addPipelineLayout(wireframePipelineLayout);
+        wireframePipeline = pso.build(VKBackend::device, pipelineCache);
+    }
+
 
     vkDestroyShaderModule(VKBackend::device, result.vsModule, nullptr);
     vkDestroyShaderModule(VKBackend::device, result.fsModule, nullptr);
@@ -984,68 +1023,6 @@ void createPipelineCache(const VkDevice device)
     {
         throw std::runtime_error("failed to create graphics pipeline cache!");
     }
-}
-
-VkPipeline createGraphicsPipeline(VkDevice device, VkPipelineCache pipelineCache, VkRenderPass renderPass, VkShaderModule vsModule, VkShaderModule fsModule,
-    std::vector<VkVertexInputAttributeDescription>& vertIPAttribDesc, 
-    std::vector<VkVertexInputBindingDescription>& vertIPBindDesc,
-    const VkPipelineLayout pipelineLayout,
-    const VkPolygonMode polygonMode,
-    const VkPrimitiveTopology primToplogy)
-{
-    VkPipelineShaderStageCreateInfo stages[2] = {};
-    stages[0] = VKBackend::getPipelineShaderStage(VK_SHADER_STAGE_VERTEX_BIT, vsModule);
-    stages[1] = VKBackend::getPipelineShaderStage(VK_SHADER_STAGE_FRAGMENT_BIT, fsModule);
-
-    auto vertexInputInfo = VKBackend::getPipelineVertexInputState(static_cast<uint32_t>(vertIPBindDesc.size()), vertIPBindDesc.data(), static_cast<uint32_t>(vertIPAttribDesc.size()),
-        vertIPAttribDesc.data());
-    auto inputAssembly = VKBackend::getPipelineInputAssemblyState(primToplogy, VK_FALSE);
-    auto viewportState = VKBackend::getPipelineViewportState(1, 1);
-    auto rasterizer = VKBackend::getPipelineRasterState(polygonMode, 1.0f);
-    auto multisampling = VKBackend::getPipelineMultisampleState(VK_FALSE, VKBackend::msaaSamples);
-    auto depthStencil = VKBackend::getPipelineDepthStencilState(VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS, VK_FALSE, 0.0f, 1.0f, VK_FALSE);
-
-    VkPipelineColorBlendAttachmentState colorBlendAttachment = VKBackend::getPipelineColorBlendAttachState(VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT, VK_FALSE);
-    const float blendConsts[4] = { 0,0,0,0 };
-    auto colorBlending = VKBackend::getPipelineColorBlendState(VK_FALSE, VK_LOGIC_OP_COPY, 1, &colorBlendAttachment, blendConsts);
-
-    std::vector<VkDynamicState> dynamicStates = {
-        VK_DYNAMIC_STATE_VIEWPORT,
-        VK_DYNAMIC_STATE_SCISSOR
-    };
-    auto dynamicState = VKBackend::getPipelineDynamicState(dynamicStates);
-
-    VkPipeline graphicsPipeline;
-    VkGraphicsPipelineCreateInfo pipelineInfo{};
-    pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipelineInfo.stageCount = 2;
-    pipelineInfo.pStages = stages;
-    pipelineInfo.pVertexInputState = &vertexInputInfo;
-    pipelineInfo.pInputAssemblyState = &inputAssembly;
-    pipelineInfo.pViewportState = &viewportState;
-    pipelineInfo.pRasterizationState = &rasterizer;
-    pipelineInfo.pMultisampleState = &multisampling;
-    pipelineInfo.pColorBlendState = &colorBlending;
-    pipelineInfo.pDynamicState = &dynamicState;
-    pipelineInfo.pDepthStencilState = &depthStencil;
-    pipelineInfo.layout = pipelineLayout;
-    pipelineInfo.renderPass = renderPass;
-    pipelineInfo.subpass = 0;
-    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
-
-    if (vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create graphics pipeline!");
-    }
-
-    //rasterizer.polygonMode = VK_POLYGON_MODE_LINE;
-    ////https://github.com/KhronosGroup/Vulkan-LoaderAndValidationLayers/issues/785
-    //pipelineInfo.pRasterizationState = &rasterizer;
-
-    //if (vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineInfo, nullptr, &wireframePipeline) != VK_SUCCESS) {
-    //    throw std::runtime_error("failed to create graphics pipeline for wireframe !");
-    //}
-
-    return graphicsPipeline;
 }
 void createFramebuffers()
 {
