@@ -1,43 +1,103 @@
 #include "VKPso.h"
 
-VKPso::VKPso():device(VK_NULL_HANDLE), renderPass(VK_NULL_HANDLE), pipelineCache(VK_NULL_HANDLE),descPool(VK_NULL_HANDLE)
+VKPso::VKPso() 
 {
+	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 }
 
-VKPso::VKPso(VkDevice dvc, VkRenderPass rPass, VkPipelineCache pCache,VkDescriptorPool desPool): device(dvc),renderPass(rPass),pipelineCache(pCache),descPool(desPool)
+VKPso& VKPso::addShaderModules(VkShaderModule vsModule, VkShaderModule fsModule)
 {
+	// TODO: What if the pipeline has more stages ?
+	//VkPipelineShaderStageCreateInfo stages[2] = {};
+	stages.clear();
+	stages.push_back(VKBackend::getPipelineShaderStage(VK_SHADER_STAGE_VERTEX_BIT, vsModule));
+	stages.push_back(VKBackend::getPipelineShaderStage(VK_SHADER_STAGE_FRAGMENT_BIT, fsModule));
+
+	pipelineInfo.stageCount = static_cast<uint32_t>(stages.size());
+	pipelineInfo.pStages = stages.data();
+
+	return *this;
 }
 
-void VKPso::prepareShaders(const std::vector<unsigned char>& vsFileContent, const std::vector<unsigned char>& fsFileContent)
+VKPso& VKPso::addPipelineVertexInputState(VkPipelineVertexInputStateCreateInfo cInfo)
 {
-    auto triangleVS = VKBackend::loadShader(VKBackend::device, vsFileContent);
-    assert(triangleVS);
-    auto triangleFS = VKBackend::loadShader(VKBackend::device, fsFileContent);
-    assert(triangleFS);
-
-    auto setsV = VKBackend::getDescriptorSetLayoutDataFromSpv(vsFileContent);
-    auto setsF = VKBackend::getDescriptorSetLayoutDataFromSpv(fsFileContent);
-
-    std::vector<VkVertexInputAttributeDescription> vertIPAttribDesc;
-    std::vector<VkVertexInputBindingDescription> vertIPBindDesc;
-    VKBackend::getInputInfoFromSpv(vsFileContent, vertIPAttribDesc, vertIPBindDesc, false);
-
-    std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
-
-    for (const auto& set : setsV)
-    {
-        layoutBindings.insert(layoutBindings.end(), set.bindings.begin(), set.bindings.end());
-    }
-
-    for (const auto& set : setsF)
-    {
-        layoutBindings.insert(layoutBindings.end(), set.bindings.begin(), set.bindings.end());
-    }
-
-    auto descriptorsetLayout = VKBackend::getDescriptorSetLayout(layoutBindings);
-    
+	pipelineInfo.pVertexInputState = &cInfo;
+	return *this;
 }
 
-void VKPso::addDescriptor(VKBackend::Descriptor descriptor)
+VKPso& VKPso::addPipelineInputAssemblyState(VkPipelineInputAssemblyStateCreateInfo cInfo)
 {
+	pipelineInfo.pInputAssemblyState = &cInfo;
+	return *this;
+}
+
+VKPso& VKPso::addPipelineViewportState(VkPipelineViewportStateCreateInfo cInfo)
+{
+	pipelineInfo.pViewportState = &cInfo;
+	return *this;
+}
+
+VKPso& VKPso::addPipelineRasterState(VkPipelineRasterizationStateCreateInfo cInfo)
+{
+	pipelineInfo.pRasterizationState = &cInfo;
+	return *this;
+}
+
+VKPso& VKPso::addPipelineMultisampleState(VkPipelineMultisampleStateCreateInfo cInfo)
+{
+	pipelineInfo.pMultisampleState = &cInfo;
+	return *this;
+}
+
+VKPso& VKPso::addPipelineColorBlendState(VkPipelineColorBlendStateCreateInfo cInfo)
+{
+	pipelineInfo.pColorBlendState = &cInfo;
+	return *this;
+}
+
+VKPso& VKPso::addPipelineDynamicState(VkPipelineDynamicStateCreateInfo cInfo)
+{
+	pipelineInfo.pDynamicState = &cInfo;
+	return *this;
+}
+
+VKPso& VKPso::addPipelineDepthStencilState(VkPipelineDepthStencilStateCreateInfo cInfo)
+{
+	pipelineInfo.pDepthStencilState = &cInfo;
+	return *this;
+}
+
+VKPso& VKPso::addPipelineLayout(const VkPipelineLayout pipelineLayout)
+{
+	pipelineInfo.layout = pipelineLayout;
+	return *this;
+}
+
+VKPso& VKPso::addRenderpass(const VkRenderPass renderPass)
+{
+	pipelineInfo.renderPass = renderPass;
+	return *this;
+}
+
+VKPso& VKPso::addSubpass(const uint32_t subPass)
+{
+	pipelineInfo.subpass = subPass;
+	return *this;
+}
+
+VKPso& VKPso::addBasePipelineHandle(const VkPipeline pipeline)
+{
+	pipelineInfo.basePipelineHandle = pipeline;
+	return *this;
+}
+
+VkPipeline VKPso::build(const VkDevice device, const VkPipelineCache pipelineCache)
+{
+	assert(device!=VK_NULL_HANDLE);
+
+	VkPipeline pipeline;
+	if (vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineInfo, nullptr, &pipeline) != VK_SUCCESS) {
+		throw std::runtime_error("failed to create graphics pipeline!");
+	}
+	return pipeline;
 }

@@ -4,18 +4,25 @@
 
 class VKPso
 {
-	//All components required to create pipeline object
-	//descriptors
 public:
 	VKPso();
-	VKPso(VkDevice dece,VkRenderPass rPass,VkPipelineCache pCache,VkDescriptorPool desPool);
-	void prepareShaders(const std::vector<unsigned char> &vsFileContent, const std::vector<unsigned char>& fsFileContent);
-	void addDescriptor(VKBackend::Descriptor descriptor);
+
+	VKPso& addShaderModules(VkShaderModule vsModule, VkShaderModule fsModule);
+	VKPso& addPipelineVertexInputState(VkPipelineVertexInputStateCreateInfo cInfo);
+	VKPso& addPipelineInputAssemblyState(VkPipelineInputAssemblyStateCreateInfo cInfo);
+	VKPso& addPipelineViewportState(VkPipelineViewportStateCreateInfo cInfo);
+	VKPso& addPipelineRasterState(VkPipelineRasterizationStateCreateInfo cInfo);
+	VKPso& addPipelineMultisampleState(VkPipelineMultisampleStateCreateInfo cInfo);
+	VKPso& addPipelineColorBlendState(VkPipelineColorBlendStateCreateInfo cInfo);
+	VKPso& addPipelineDynamicState(VkPipelineDynamicStateCreateInfo cInfo);
+	VKPso& addPipelineDepthStencilState(VkPipelineDepthStencilStateCreateInfo cInfo);
+	VKPso& addPipelineLayout(const VkPipelineLayout pipelineLayout);
+	VKPso& addRenderpass(const VkRenderPass renderPass);
+	VKPso& addSubpass(const uint32_t subPass);
+	VKPso& addBasePipelineHandle(const VkPipeline pipeline);
+	VkPipeline build(const VkDevice device, const VkPipelineCache pipelineCache);
 private:
-	VkDevice device;
-	VkRenderPass renderPass;
-	VkPipelineCache pipelineCache;
-	VkDescriptorPool descPool;
-	std::vector<VkDescriptorPoolSize> poolsizes;
+	VkGraphicsPipelineCreateInfo pipelineInfo{};
+	std::vector<VkPipelineShaderStageCreateInfo> stages;
 };
 
