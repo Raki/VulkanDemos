@@ -439,8 +439,8 @@ struct DescSetBuildResult
     VkDescriptorSetLayout descSetLayout;
     std::vector<VkVertexInputAttributeDescription> vertIPAttribDesc;
     std::vector<VkVertexInputBindingDescription> vertIPBindDesc;
-    VkShaderModule triangleVS;
-    VkShaderModule triangleFS;
+    VkShaderModule vsModule;
+    VkShaderModule fsModule;
 };
 
 Buffer uboFrag,uboVert;
@@ -469,22 +469,6 @@ std::shared_ptr<VKBackend::VKTexture> texture,redTexture;
 VkDescriptorSetLayout descLayoutFlat;
 std::vector<Descriptor> descriptors, descriptorsFlat;
 std::vector<VkDescriptorSet> descriptorSetsFlat;
-
-struct FiveColors
-{
-    /*
-    * e63946
-    * f1faee
-    * a8dadc
-    * 457b9d
-    * 1d3557
-    */
-    glm::vec3 col1;
-    glm::vec3 col2;
-    glm::vec3 col3;
-    glm::vec3 col4;
-    glm::vec3 col5;
-};
 
 //BVH
 using uint = unsigned int;
@@ -535,11 +519,8 @@ void destroyVulkan();
 
 VkSurfaceKHR createSurface(GLFWwindow* window, VkInstance instace);
 void createUniformBuffers();
-void createDescriptorSets(const VkDevice device, const std::vector<Descriptor>& descriptors);
-void createDescriptorSets(const VkDevice device, const std::vector<Descriptor>& descriptors,std::vector<VkDescriptorSet> &descSets);
 void createDescriptorSets(const VkDevice device, const std::vector<Descriptor>& descriptors, std::vector<VkDescriptorSet>& descSets,VkDescriptorSetLayout descLayout);
 void createPipelineCache(const VkDevice device);
-VkPipeline createGraphicsPipeline(VkDevice device, VkRenderPass renderPass, VkShaderModule vsModule, VkShaderModule fsModule);
 //ToDo: Any chance to improve this?
 VkPipeline createGraphicsPipeline(VkDevice device,VkPipelineCache pipelineCache , VkRenderPass renderPass, VkShaderModule vsModule, VkShaderModule fsModule,
     std::vector<VkVertexInputAttributeDescription>& vertIPAttribDesc, 
@@ -645,8 +626,6 @@ void initVulkan()
     VKBackend::commandPool = VKBackend::createCommandPool(VKBackend::device);
     VKBackend::createCommandBuffers(VKBackend::device, VKBackend::commandPool);
 
-    createUniformBuffers();
-
     // create descriptor pool
     std::vector<VkDescriptorPoolSize> poolsizes;
 
@@ -667,6 +646,9 @@ void initVulkan()
     }
     VKBackend::createDescriptorPool(VKBackend::device, poolsizes);
 
+    //create resoucres for descriptors 
+    createUniformBuffers();
+
     texture = VKBackend::createVKTexture("img/sample.jpg");
 
     auto image = std::make_shared<Image>();
@@ -683,13 +665,14 @@ void initVulkan()
     buildDescriptorsFor(FRAG_SHADER_SPV, VERT_SHADER_SPV, result, image);
     buildDescriptorsFor("shaders/simpleMatFlat.frag.spv", "shaders/simpleMatBVHFlat.vert.spv", resultFlat, nullptr);
 
-    VKBackend::descriptorSetLayout = result.descSetLayout;
-    VKBackend::descriptorSets = result.descSets;
-    descriptors = result.descriptors;
-
-    descriptorSetsFlat = resultFlat.descSets;
-    descriptorsFlat = resultFlat.descriptors;
-    descLayoutFlat = resultFlat.descSetLayout;
+    
+    VKBackend::descriptorSetLayout = result.descSetLayout;  //To build pipeline
+    VKBackend::descriptorSets = result.descSets;            //To use while rendering
+    descriptors = result.descriptors;                       //To destroy in the end         
+                
+    descriptorSetsFlat = resultFlat.descSets;               //To build pipeline
+    descriptorsFlat = resultFlat.descriptors;               //To use while rendering
+    descLayoutFlat = resultFlat.descSetLayout;              //To destroy in the end
 
 
     VkPushConstantRange pushConstant;
@@ -705,17 +688,17 @@ void initVulkan()
     wireframePipelineLayout = VKBackend::createPipelineLayout(descriptorLayoutsWF, pushConstants);
 
     createPipelineCache(VKBackend::device);
-    VKBackend::graphicsPipeline = createGraphicsPipeline(VKBackend::device,pipelineCache, VKBackend::renderPass, result.triangleVS, result.triangleFS,
+    VKBackend::graphicsPipeline = createGraphicsPipeline(VKBackend::device,pipelineCache, VKBackend::renderPass, result.vsModule, result.fsModule,
         result.vertIPAttribDesc,result.vertIPBindDesc, VKBackend::pipelineLayout,VK_POLYGON_MODE_FILL, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 
-    wireframePipeline = createGraphicsPipeline(VKBackend::device, pipelineCache, VKBackend::renderPass, resultFlat.triangleVS, resultFlat.triangleFS,
+    wireframePipeline = createGraphicsPipeline(VKBackend::device, pipelineCache, VKBackend::renderPass, resultFlat.vsModule, resultFlat.fsModule,
         resultFlat.vertIPAttribDesc, resultFlat.vertIPBindDesc, wireframePipelineLayout,VK_POLYGON_MODE_LINE, VK_PRIMITIVE_TOPOLOGY_LINE_LIST);
 
-    vkDestroyShaderModule(VKBackend::device, result.triangleVS, nullptr);
-    vkDestroyShaderModule(VKBackend::device, result.triangleFS, nullptr);
+    vkDestroyShaderModule(VKBackend::device, result.vsModule, nullptr);
+    vkDestroyShaderModule(VKBackend::device, result.fsModule, nullptr);
 
-    vkDestroyShaderModule(VKBackend::device, resultFlat.triangleVS, nullptr);
-    vkDestroyShaderModule(VKBackend::device, resultFlat.triangleFS, nullptr);
+    vkDestroyShaderModule(VKBackend::device, resultFlat.vsModule, nullptr);
+    vkDestroyShaderModule(VKBackend::device, resultFlat.fsModule, nullptr);
 
     createColorResource();
     createDepthResources();
@@ -732,10 +715,10 @@ void buildDescriptorsFor(const std::string fsPath,const std::string vsPath, Desc
     const auto vsFileContent = Utility::readBinaryFileContents(vsPath);
     const auto fsFileContent = Utility::readBinaryFileContents(fsPath);
 
-    result.triangleVS = VKBackend::loadShader(VKBackend::device, vsFileContent);
-    assert(result.triangleVS);
-    result.triangleFS = VKBackend::loadShader(VKBackend::device, fsFileContent);
-    assert(result.triangleFS);
+    result.vsModule = VKBackend::loadShader(VKBackend::device, vsFileContent);
+    assert(result.vsModule);
+    result.fsModule = VKBackend::loadShader(VKBackend::device, fsFileContent);
+    assert(result.fsModule);
 
     auto setsV = VKBackend::getDescriptorSetLayoutDataFromSpv(vsFileContent);
     auto setsF = VKBackend::getDescriptorSetLayoutDataFromSpv(fsFileContent);
@@ -949,94 +932,6 @@ void createUniformBuffers()
        uboFrag.bufferInfo.at(i).range = uboFrag.range;
     }
 }
-void createDescriptorSets(const VkDevice device, const std::vector<Descriptor>& descriptors)
-{
-    std::vector<VkDescriptorSetLayout> layouts(VKBackend::swapchainMinImageCount, VKBackend::descriptorSetLayout);
-    VkDescriptorSetAllocateInfo allocateInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-    allocateInfo.descriptorPool = VKBackend::descriptorPool;
-    allocateInfo.descriptorSetCount = static_cast<uint32_t>(3);
-    allocateInfo.pSetLayouts = layouts.data();;
-
-    VKBackend::descriptorSets.resize(VKBackend::swapchainMinImageCount);
-
-    if (vkAllocateDescriptorSets(device, &allocateInfo, VKBackend::descriptorSets.data()) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to allocate descriptor sets!");
-    }
-
-    for (size_t i = 0; i < VKBackend::swapchainMinImageCount; i++)
-    {
-        std::vector<VkWriteDescriptorSet> descriptorWrites(descriptors.size());
-
-        for (size_t d = 0; d < descriptors.size(); d++)
-        {
-            descriptorWrites.at(d).sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptorWrites.at(d).dstSet = VKBackend::descriptorSets[i];
-            descriptorWrites.at(d).dstBinding = descriptors.at(d).layout.binding;
-            descriptorWrites.at(d).dstArrayElement = 0;
-            descriptorWrites.at(d).descriptorType = descriptors.at(d).layout.descriptorType;
-            descriptorWrites.at(d).descriptorCount = descriptors.at(d).layout.descriptorCount;
-            if (descriptors.at(d).layout.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
-            {
-                descriptors.at(d).buffer->bufferInfo.at(i).buffer = descriptors.at(d).buffer->uniformBuffers.at(i);
-                descriptors.at(d).buffer->bufferInfo.at(i).offset = 0;
-                descriptors.at(d).buffer->bufferInfo.at(i).range = descriptors.at(d).buffer->range;
-                descriptorWrites.at(d).pBufferInfo = &descriptors.at(d).buffer->bufferInfo.at(i);
-            }
-            else if (descriptors.at(d).layout.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-            {
-                descriptorWrites.at(d).pImageInfo = &descriptors.at(d).image->imageInfo;
-            }
-            
-        }
-
-        vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
-    }
-}
-void createDescriptorSets(const VkDevice device, const std::vector<Descriptor>& descriptors, std::vector<VkDescriptorSet>& descSets)
-{
-    std::vector<VkDescriptorSetLayout> layouts(VKBackend::swapchainMinImageCount, VKBackend::descriptorSetLayout);
-    VkDescriptorSetAllocateInfo allocateInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-    allocateInfo.descriptorPool = VKBackend::descriptorPool;
-    allocateInfo.descriptorSetCount = static_cast<uint32_t>(3);
-    allocateInfo.pSetLayouts = layouts.data();;
-
-    descSets.resize(VKBackend::swapchainMinImageCount);
-
-    if (vkAllocateDescriptorSets(device, &allocateInfo, descSets.data()) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to allocate descriptor sets!");
-    }
-
-    for (size_t i = 0; i < VKBackend::swapchainMinImageCount; i++)
-    {
-        std::vector<VkWriteDescriptorSet> descriptorWrites(descriptors.size());
-
-        for (size_t d = 0; d < descriptors.size(); d++)
-        {
-            descriptorWrites.at(d).sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptorWrites.at(d).dstSet = descSets[i];
-            descriptorWrites.at(d).dstBinding = descriptors.at(d).layout.binding;
-            descriptorWrites.at(d).dstArrayElement = 0;
-            descriptorWrites.at(d).descriptorType = descriptors.at(d).layout.descriptorType;
-            descriptorWrites.at(d).descriptorCount = descriptors.at(d).layout.descriptorCount;
-            if (descriptors.at(d).layout.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
-            {
-                descriptors.at(d).buffer->bufferInfo.at(i).buffer = descriptors.at(d).buffer->uniformBuffers.at(i);
-                descriptors.at(d).buffer->bufferInfo.at(i).offset = 0;
-                descriptors.at(d).buffer->bufferInfo.at(i).range = descriptors.at(d).buffer->range;
-                descriptorWrites.at(d).pBufferInfo = &descriptors.at(d).buffer->bufferInfo.at(i);
-            }
-            else if (descriptors.at(d).layout.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-            {
-                descriptorWrites.at(d).pImageInfo = &descriptors.at(d).image->imageInfo;
-            }
-
-        }
-
-        vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
-    }
-}
 void createDescriptorSets(const VkDevice device, const std::vector<Descriptor>& descriptors, std::vector<VkDescriptorSet>& descSets, VkDescriptorSetLayout descLayout)
 {
     std::vector<VkDescriptorSetLayout> layouts(VKBackend::swapchainMinImageCount, descLayout);
@@ -1090,71 +985,7 @@ void createPipelineCache(const VkDevice device)
         throw std::runtime_error("failed to create graphics pipeline cache!");
     }
 }
-VkPipeline createGraphicsPipeline(VkDevice device, VkRenderPass renderPass, VkShaderModule vsModule, VkShaderModule fsModule)
-{
-    VkPipelineShaderStageCreateInfo stages[2] = {};
-    stages[0] = VKBackend::getPipelineShaderStage(VK_SHADER_STAGE_VERTEX_BIT,vsModule);
-    stages[1] = VKBackend::getPipelineShaderStage(VK_SHADER_STAGE_FRAGMENT_BIT, fsModule);
-    
 
-    auto vertBindingDesc = VKUtility::Vertex::getBindingDescription();
-    auto vertAttribDescs = VKUtility::Vertex::getAttributeDescriptions();
-
-    auto vertexInputInfo = VKBackend::getPipelineVertexInputState(1, &vertBindingDesc,static_cast<uint32_t>(vertAttribDescs.size()),
-        vertAttribDescs.data());
-    auto inputAssembly = VKBackend::getPipelineInputAssemblyState(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_FALSE);
-    auto viewportState = VKBackend::getPipelineViewportState(1, 1);
-    auto rasterizer = VKBackend::getPipelineRasterState(VK_POLYGON_MODE_FILL, 1.0f);
-    //rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-    //rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
-    //rasterizer.depthBiasEnable = VK_FALSE;
-    auto multisampling = VKBackend::getPipelineMultisampleState(VK_FALSE, VKBackend::msaaSamples);
-    auto depthStencil = VKBackend::getPipelineDepthStencilState(VK_TRUE,VK_TRUE,VK_COMPARE_OP_LESS,VK_FALSE,0.0f,1.0f,VK_FALSE);
-
-    VkPipelineColorBlendAttachmentState colorBlendAttachment = VKBackend::getPipelineColorBlendAttachState(VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT, VK_FALSE);
-    const float blendConsts[4] = {0,0,0,0};
-    auto colorBlending = VKBackend::getPipelineColorBlendState(VK_FALSE, VK_LOGIC_OP_COPY, 1, &colorBlendAttachment, blendConsts);
-
-    std::vector<VkDynamicState> dynamicStates = {
-        VK_DYNAMIC_STATE_VIEWPORT,
-        VK_DYNAMIC_STATE_SCISSOR
-    };
-    auto dynamicState = VKBackend::getPipelineDynamicState(dynamicStates);
-
-    VkPushConstantRange pushConstant;
-    pushConstant.offset = 0;
-    pushConstant.size = sizeof(PushConstant);
-    pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-    std::vector<VkPushConstantRange> pushConstants = {pushConstant};
-    std::vector<VkDescriptorSetLayout> descriptorLayouts = { VKBackend::descriptorSetLayout };
-
-    VKBackend::pipelineLayout = VKBackend::createPipelineLayout(descriptorLayouts, pushConstants);
-
-    VkPipeline graphicsPipeline;
-    VkGraphicsPipelineCreateInfo pipelineInfo{};
-    pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipelineInfo.stageCount = 2;
-    pipelineInfo.pStages = stages;
-    pipelineInfo.pVertexInputState = &vertexInputInfo;
-    pipelineInfo.pInputAssemblyState = &inputAssembly;
-    pipelineInfo.pViewportState = &viewportState;
-    pipelineInfo.pRasterizationState = &rasterizer;
-    pipelineInfo.pMultisampleState = &multisampling;
-    pipelineInfo.pColorBlendState = &colorBlending;
-    pipelineInfo.pDynamicState = &dynamicState;
-    pipelineInfo.pDepthStencilState = &depthStencil;
-    pipelineInfo.layout = VKBackend::pipelineLayout;
-    pipelineInfo.renderPass = renderPass;
-    pipelineInfo.subpass = 0;
-    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
-
-    if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create graphics pipeline!");
-    }
-
-    return graphicsPipeline;
-}
 VkPipeline createGraphicsPipeline(VkDevice device, VkPipelineCache pipelineCache, VkRenderPass renderPass, VkShaderModule vsModule, VkShaderModule fsModule,
     std::vector<VkVertexInputAttributeDescription>& vertIPAttribDesc, 
     std::vector<VkVertexInputBindingDescription>& vertIPBindDesc,
