@@ -31,6 +31,17 @@ const int WIN_HEIGHT = 1024;
 GLFWwindow* window;
 auto closeWindow = false;
 
+enum class CType { POS, NORM, UV, INDEX };
+
+struct Container
+{
+    VkDeviceSize buffSize;
+    void* data;
+    CType type;
+    VkBuffer stageBuff;
+    VkDeviceMemory stageBuffMemory;
+};
+
 struct UniformBufferObject
 {
     glm::mat4 model;
@@ -130,40 +141,30 @@ struct VKMesh
             normArr.push_back(vert.normal);
             uvArr.push_back(vert.uv);
         }
-
-        enum class CType { POS, NORM, UV, INDEX };
-
-        struct Container
-        {
-            VkDeviceSize buffSize;
-            void* data;
-            CType type;
-            VkBuffer stageBuff;
-            VkDeviceMemory stageBuffMemory;
-        };
+        
 
         std::vector<Container> cInfos;
         Container vCont;
         vCont.buffSize = sizeof(glm::vec3) * posArr.size();
-        vCont.data = posArr.data();
+        //vCont.data = posArr.data();
         vCont.type = CType::POS;
         cInfos.push_back(vCont);
 
         Container nCont;
         nCont.buffSize = sizeof(glm::vec3) * normArr.size();
-        nCont.data = normArr.data();
+        //nCont.data = normArr.data();
         nCont.type = CType::NORM;
         cInfos.push_back(nCont);
 
         Container uvCont;
         uvCont.buffSize = sizeof(glm::vec2) * uvArr.size();
-        uvCont.data = uvArr.data();
+        //uvCont.data = uvArr.data();
         uvCont.type = CType::UV;
         cInfos.push_back(uvCont);
 
         Container iCont;
         iCont.buffSize = sizeof(uint16_t) * meshData->iData.size();
-        iCont.data = meshData->iData.data();
+        //iCont.data = meshData->iData.data();
         iCont.type = CType::INDEX;
         cInfos.push_back(iCont);
 
@@ -235,6 +236,7 @@ struct VKMesh
 
 struct VKMesh3D : public VKMesh
 {
+    uint32_t drawCount=0;
     std::vector<VKUtility::VDPosNorm> vertices;
     void createBuffers(VkDevice device)
     {
@@ -295,16 +297,6 @@ struct VKMesh3D : public VKMesh
             normArr.push_back(vert.normal);
         }
 
-        enum class CType { POS, NORM, UV, INDEX };
-
-        struct Container
-        {
-            VkDeviceSize buffSize;
-            void* data;
-            CType type;
-            VkBuffer stageBuff;
-            VkDeviceMemory stageBuffMemory;
-        };
 
         std::vector<Container> cInfos;
         Container vCont;
@@ -372,6 +364,157 @@ struct VKMesh3D : public VKMesh
                 break;
             case CType::UV:
                 
+                break;
+            case CType::INDEX:
+                vkCmdCopyBuffer(commandBuffer, cInfos.at(i).stageBuff, indexBuffer, 1, &copyRegion);
+                break;
+            }
+
+        }
+
+        VKBackend::endSingleTimeCommands(commandBuffer);
+
+        for (size_t i = 0; i < cInfos.size(); i++)
+        {
+            vkDestroyBuffer(device, cInfos.at(i).stageBuff, nullptr);
+            vkFreeMemory(device, cInfos.at(i).stageBuffMemory, nullptr);
+        }
+    }
+
+    void createBuffNonInterleaved(const VkDevice& device, std::string filePath)
+    {
+        isInterleaved = false;
+        std::vector<Container> cInfos;
+
+        tinygltf::TinyGLTF loader;
+        tinygltf::Model model;
+        std::string err;
+        std::string warn;
+
+        bool res = loader.LoadBinaryFromFile(&model, &err, &warn, filePath);
+        if (!warn.empty())
+        {
+            fmt::print("WARN: {}\n", warn);
+        }
+
+        if (!err.empty())
+        {
+            fmt::print("ERR: {}\n", err);
+        }
+
+        if (!res)
+            fmt::print("Failed to load glTF: {}\n", filePath);
+        else
+            fmt::print("Loaded glTF: {}\n", filePath);
+
+        const tinygltf::Scene& scene = model.scenes[model.defaultScene];
+        for (size_t i = 0; i < scene.nodes.size(); ++i)
+        {
+            assert((scene.nodes[i] >= 0) && (scene.nodes[i] < model.nodes.size()));
+
+            auto& node = model.nodes[scene.nodes[i]];
+
+            if ((node.mesh >= 0) && (node.mesh < model.meshes.size())) {
+                //bindMesh(vbos, model, model.meshes[node.mesh]);
+                auto& mesh = model.meshes[node.mesh];
+                if (mesh.primitives.size() > 0)
+                {
+                    auto& primitive = mesh.primitives.at(0);
+                    auto& posAccrInd = primitive.attributes["POSITION"];
+                    auto& nrmAccrInd = primitive.attributes["NORMAL"];
+                    auto& uvAccrInd = primitive.attributes["TEXCOORD_0"];
+                    auto& indexAccrInd = primitive.indices;
+
+                    auto& posAccr = model.accessors.at(posAccrInd);
+                    auto& posBuffView = model.bufferViews.at(posAccr.bufferView);
+                    auto& posBuff = model.buffers.at(posBuffView.buffer);
+
+                    
+                    Container vCont;
+                    vCont.buffSize = posBuffView.byteLength;// sizeof(glm::vec3)* posArr.size();
+                    //vCont.data = &posBuff.data.at(0) + posBuffView.byteOffset;// posArr.data();
+                    //vCont.data = new float[posBuffView.byteLength / sizeof(float)];
+                    vCont.type = CType::POS;
+                    cInfos.push_back(vCont);
+
+                    auto& normAccr = model.accessors.at(nrmAccrInd);
+                    auto& normBuffView = model.bufferViews.at(normAccr.bufferView);
+                    auto& normBuff = model.buffers.at(normBuffView.buffer);
+
+                    Container nCont;
+                    nCont.buffSize = normBuffView.byteLength;// sizeof(glm::vec3)* posArr.size();
+                    //nCont.data = &normBuff.data.at(0) + normBuffView.byteOffset;// posArr.data();
+                    //nCont.data = new float[normBuffView.byteLength/sizeof(float)];
+                    nCont.type = CType::NORM;
+                    cInfos.push_back(nCont);
+
+                    auto& indexAccr = model.accessors.at(indexAccrInd);
+                    auto& indexBuffView = model.bufferViews.at(indexAccr.bufferView);
+                    auto& indexBuff = model.buffers.at(indexBuffView.buffer);
+                    drawCount = indexAccr.count;
+
+                    Container iCont;
+                    iCont.buffSize = indexBuffView.byteLength;// sizeof(glm::vec3)* posArr.size();
+                    //iCont.data = &indexBuff.data.at(0) + normBuffView.byteOffset;// posArr.data();
+                    //iCont.data = new uint16_t[indexBuffView.byteLength/sizeof(uint16_t)];
+                    iCont.type = CType::INDEX;
+                    cInfos.push_back(iCont);
+
+                    for (size_t i = 0; i < cInfos.size(); i++)
+                    {
+                        VKBackend::createBuffer(cInfos.at(i).buffSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, cInfos.at(i).stageBuff, cInfos.at(i).stageBuffMemory);
+                        vkMapMemory(device, cInfos.at(i).stageBuffMemory, 0, cInfos.at(i).buffSize, 0, &cInfos.at(i).data);
+
+                        switch (cInfos.at(i).type)
+                        {
+                        case CType::POS:
+                            memcpy(cInfos.at(i).data, &posBuff.data.at(0) + posBuffView.byteOffset , (size_t)cInfos.at(i).buffSize);
+                            break;
+                        case CType::NORM:
+                            memcpy(cInfos.at(i).data, &normBuff.data.at(0) + normBuffView.byteOffset, (size_t)cInfos.at(i).buffSize);
+                            break;
+                        case CType::UV:
+
+                            break;
+                        case CType::INDEX:
+                            memcpy(cInfos.at(i).data, &indexBuff.data.at(0) + indexBuffView.byteOffset, (size_t)cInfos.at(i).buffSize);
+                            break;
+                        }
+
+                        vkUnmapMemory(device, cInfos.at(i).stageBuffMemory);
+                    }
+
+                    break;
+                }
+                
+            }
+        }
+
+        
+
+        //create device memory backed buffer
+        VKBackend::createBuffer(cInfos.at(0).buffSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, posBuffer, posBufferMemory);
+        VKBackend::createBuffer(cInfos.at(1).buffSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, normBuffer, normBufferMemory);
+        VKBackend::createBuffer(cInfos.at(2).buffSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
+
+        //transfer memory from staging to device memory backed buffer
+
+        VkCommandBuffer commandBuffer = VKBackend::beginSingleTimeCommands();
+
+        for (size_t i = 0; i < cInfos.size(); i++)
+        {
+            VkBufferCopy copyRegion{};
+            copyRegion.size = cInfos.at(i).buffSize;
+            switch (cInfos.at(i).type)
+            {
+            case CType::POS:
+                vkCmdCopyBuffer(commandBuffer, cInfos.at(i).stageBuff, posBuffer, 1, &copyRegion);
+                break;
+            case CType::NORM:
+                vkCmdCopyBuffer(commandBuffer, cInfos.at(i).stageBuff, normBuffer, 1, &copyRegion);
+                break;
+            case CType::UV:
+
                 break;
             case CType::INDEX:
                 vkCmdCopyBuffer(commandBuffer, cInfos.at(i).stageBuff, indexBuffer, 1, &copyRegion);
@@ -1172,7 +1315,7 @@ void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex)
         vkCmdBindVertexBuffers(commandBuffer, 0, static_cast<uint32_t>(vertexBuffers.size()), vertexBuffers.data(), &offsets.at(0));
         vkCmdBindIndexBuffer(commandBuffer, shape->indexBuffer, 0, VK_INDEX_TYPE_UINT16);
         vkCmdPushConstants(commandBuffer, VKBackend::pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant), &pConstant);
-        vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(shape->meshData->iData.size()), 1, 0, 0, 0);
+        vkCmdDrawIndexed(commandBuffer, (shape->drawCount>0)?shape->drawCount:static_cast<uint32_t>(shape->meshData->iData.size()), 1, 0, 0, 0);
     }
 
     vkCmdEndRenderPass(commandBuffer);
@@ -1441,36 +1584,7 @@ void fillCube(float width, float height, float depth,glm::mat4 tMat, std::vector
 }
 void setupScene()
 {
-   /* cube = std::make_shared<VKMesh3D>();
-
-    std::vector<VKUtility::VDPosNorm> verts;
-    std::vector<uint16_t> inds;
-
-    const int rows = 1;
-    const int cols = 1;
-
-    glm::vec3 origin = glm::vec3(-rows / 2, 0, -cols / 2);
-    for (int row = 0; row < rows; row++)
-    {
-        for (int col = 0; col < cols; col++)
-        {
-            int ind = (row * rows) + col;
-            float noise = (rand() % 100) / 100.0f;
-            float h = 0.8f + (noise * 2);
-            auto trans = glm::vec3(origin.x + (row), origin.y + (h / 2), origin.z + (col));
-            auto tMat = glm::translate(glm::mat4(1), trans);
-            fillCube(0.8f, h, 0.8f, tMat, verts, inds);
-        }
-    }
-    cube->vertices = verts;
-    cube->indices = inds;
-    cube->createBuffers(VKBackend::device);
-    cube->tMatrix = glm::mat4(1);
-
-    shapes.push_back(cube);*/
-    
     setupRandomTris();
-    //loadGlbModel("models/Avocado.glb");
 
     lightInfo.position = glm::vec4(0, 20, 0, 0);
     lightInfo.color = glm::vec4(0.5, 0.5, 1.f, 1.0f);
@@ -1593,15 +1707,43 @@ void loadGlbModel(std::string filePath)
             auto& mesh = model.meshes[node.mesh];
             if (mesh.primitives.size() > 0)
             {
-                //auto& primitive = mesh.primitives.at(0);
-                //auto& posAccrInd = primitive.attributes["POSITION"];
-                //auto& nrmAccrInd = primitive.attributes["NORMAL"];
-                //auto& uvAccrInd = primitive.attributes["TEXCOORD_0"];
+                auto& primitive = mesh.primitives.at(0);
+                auto& posAccrInd = primitive.attributes["POSITION"];
+                auto& nrmAccrInd = primitive.attributes["NORMAL"];
+                auto& uvAccrInd = primitive.attributes["TEXCOORD_0"];
+                auto& indexAccrInd = primitive.indices;
 
-                //auto& posAccr = model.accessors.at(posAccrInd);
-                //auto& posBuffView = model.bufferViews.at(posAccr.bufferView);
-                //auto& posBuff = model.buffers.at(posBuffView.buffer);
+                auto& posAccr = model.accessors.at(posAccrInd);
+                auto& posBuffView = model.bufferViews.at(posAccr.bufferView);
+                auto& posBuff = model.buffers.at(posBuffView.buffer);
+
+                std::vector<Container> cInfos;
+                Container vCont;
+                vCont.buffSize = posBuffView.byteLength;// sizeof(glm::vec3)* posArr.size();
+                vCont.data = &posBuff.data.at(0)+posBuffView.byteOffset;// posArr.data();
+                vCont.type = CType::POS;
+                cInfos.push_back(vCont);
+
+                auto& normAccr = model.accessors.at(nrmAccrInd);
+                auto& normBuffView = model.bufferViews.at(normAccr.bufferView);
+                auto& normBuff = model.buffers.at(normBuffView.buffer);
                 
+                Container nCont;
+                nCont.buffSize = normBuffView.byteLength;// sizeof(glm::vec3)* posArr.size();
+                nCont.data = &normBuff.data.at(0) + normBuffView.byteOffset;// posArr.data();
+                nCont.type = CType::NORM;
+                cInfos.push_back(nCont);
+
+                auto& indexAccr = model.accessors.at(indexAccrInd);
+                auto& indexBuffView = model.bufferViews.at(indexAccr.bufferView);
+                auto& indexBuff = model.buffers.at(indexBuffView.buffer);
+
+                Container iCont;
+                iCont.buffSize = normBuffView.byteLength;// sizeof(glm::vec3)* posArr.size();
+                iCont.data = &indexBuff.data.at(0) + normBuffView.byteOffset;// posArr.data();
+                iCont.type = CType::INDEX;
+                cInfos.push_back(nCont);
+
             }
         }
     }
